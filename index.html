@@ -3,17 +3,6 @@
 
   <head>
     <meta charset="UTF-8">
-    <title>RILEWSv10</title>
-    <link rel="stylesheet" href="./style.css">
-
-  </head>
-    
-  <body>
-  <!DOCTYPE html>
-<html lang="en">
-
-  <head>
-    <meta charset="UTF-8">
     <title>LIGTAS-RILEWSv8.0_CSVfallback__pulseeffectedition-ultimate</title>
     <link rel="stylesheet" href="./style.css">
 
@@ -72,8 +61,27 @@
             <details open>
                 <summary>Map Controls</summary>
                 
+                <div class="control-group">
+                    <h5>Weather Forecast (CReSS)</h5>
+                     <h5>Feature not yet available</h5>
 
-
+                    <div class="playback-controls">
+                        <button id="prevBtn">Prev</button>
+                        <button id="playBtn">Play</button>
+                        <button id="pauseBtn">Pause</button>
+                        <button id="stopBtn">Stop</button>
+                        <button id="nextBtn">Next</button>
+                    </div>
+                    <div style="text-align: center; margin: 5px 0; font-weight: bold;">
+                        <span id="currentGroup">Day: 1</span>
+                    </div>
+                    <div id="speedControl">
+                        <label for="speedSlider">Speed:</label>
+                        <input type="range" id="speedSlider" min="1" max="10" value="5" step="1">
+                        <span id="speedValue">5s</span>
+                    </div>
+                </div>
+<hr>
                 <div class="control-group">
                     <h5>Global Layer Controls</h5>
                     <button class="btn" style="background:var(--primary-color); width:100%; margin-bottom:5px;" id="addAllBtn">Show All Layers</button>
@@ -118,11 +126,6 @@
     <script src="./script.js"></script>
 
 </body>
-</html>
-    <script  src="./script.js"></script>
-
-  </body>
-  
 </html>
     <script  src="./script.js"></script>
 
