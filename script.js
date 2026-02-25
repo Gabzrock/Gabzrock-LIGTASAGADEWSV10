@@ -227,6 +227,7 @@ const layerData = [
     { name: 'LIGTAS AWS', desc: 'Monitoring Station', color: 'white' },
     { name: 'SARAI AWS', desc: 'Monitoring Station', color: 'white' },
     { name: 'ASTI AWS', desc: 'Monitoring Station', color: 'white' },
+    { name: 'PAGASA AWS', desc: 'Monitoring Station', color: 'white' },
     { name: 'Yellow buffer', desc: 'Warning Level 1 (20km)', color: 'yellow' },
     { name: 'Orange buffer', desc: 'Warning Level 2 (20km)', color: 'orange' },
     { name: 'Red buffer', desc: 'Warning Level 3 (20km)', color: 'red' }
@@ -239,7 +240,8 @@ const layerLogos = [
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/logo3.png', 
     'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png', 
     'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/02/SARAI.png', 
-    'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/10/DOST-ASTI-Logo-RGB-e1722929759841.png', 
+    'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/10/DOST-ASTI-Logo-RGB-e1722929759841.png',
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LOGO2.png', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/layer_layers_icon_193964.png',
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/layer_layers_icon_193964.png',
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/layer_layers_icon_193964.png'
@@ -479,6 +481,8 @@ function getBufferColor(warningLevel) {
 function getStationIcon(stationName) {
     if (stationName && stationName.includes('ASTI')) return layerLogos[6];
     if (stationName && stationName.includes('SARAI')) return layerLogos[5];
+    if (stationName && stationName.includes('PAGASA')) return layerLogos[7];
+
     return layerLogos[4]; 
 }
 
