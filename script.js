@@ -535,7 +535,7 @@ function processAWSData(data) {
                         <table class="popup-table">
                             <tr><th>Status</th><td>${station.Status || 'N/A'}</td></tr>
                             <tr><th>Location</th><td>${station.LocationDetails || station.Municipality || 'N/A'}</td></tr>
-                            <tr><th>Rainfall (Total)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
+                            <tr><th>7-day Rainfall Accumulated (Total)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
                             <tr><th>Warning Level</th><td>${station.RainfallLandslidethresholdwarninglevel || '0'}</td></tr>
                             <tr><th>Description</th><td>${station.Rainfalldescription || 'N/A'}</td></tr>
                             <tr><th>Scenario</th><td>${station.Possiblescenario || 'N/A'}</td></tr>
