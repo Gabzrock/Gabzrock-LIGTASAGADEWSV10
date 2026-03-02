@@ -475,6 +475,7 @@ function getBufferColor(warningLevel) {
     if (warningLevel === 1) return 'yellow';
     if (warningLevel === 2) return 'orange';
     if (warningLevel === 3) return 'red';
+
     return null;
 }
 
@@ -504,10 +505,20 @@ function processAWSData(data) {
             
             if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
 
-            var warningLevel = parseInt(station.RainfallLandslidethresholdwarninglevel);
+            // Updated buffer logic
+            var rawWarningLevel = String(station.RainfallLandslidethresholdwarninglevel).trim();
+            var warningLevel = parseInt(rawWarningLevel);
             var color = getBufferColor(warningLevel);
+            var isInactive = (rawWarningLevel === 'down' || rawWarningLevel === 'N/A' || rawWarningLevel === '#VALUE!');
             
-            if (color) {
+            if (isInactive) {
+                // Buffer is transparent, dash array turns white, no pulse circle
+                var staticCircle = L.circle([lat, lng], {
+                    color: 'white', fillColor: 'transparent', fillOpacity: 0,
+                    radius: 20000, weight: 2, dashArray: '5, 10', interactive: false 
+                });
+                warningLayerGroup.addLayer(staticCircle);
+            } else if (color) {
                 var staticCircle = L.circle([lat, lng], {
                     color: color, fillColor: color, fillOpacity: 0.05,
                     radius: 20000, weight: 2, dashArray: '5, 10', interactive: false 
@@ -535,7 +546,7 @@ function processAWSData(data) {
                         <table class="popup-table">
                             <tr><th>Status</th><td>${station.Status || 'N/A'}</td></tr>
                             <tr><th>Location</th><td>${station.LocationDetails || station.Municipality || 'N/A'}</td></tr>
-                            <tr><th>7-day Rainfall Accumulated (Total)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
+                            <tr><th>Rainfall (Total)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
                             <tr><th>Warning Level</th><td>${station.RainfallLandslidethresholdwarninglevel || '0'}</td></tr>
                             <tr><th>Description</th><td>${station.Rainfalldescription || 'N/A'}</td></tr>
                             <tr><th>Scenario</th><td>${station.Possiblescenario || 'N/A'}</td></tr>
