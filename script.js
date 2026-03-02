@@ -404,13 +404,9 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
         });
 }
 
-// --- UPDATED LAYER DEFINITIONS ---
 const layerPromises = [
     createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, className: 'flashing-high'}, null),
-    
-    // UPDATED: Added className: 'flashing-high' to make this layer flash
     createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.6, className: 'flashing-high' }),
-    
     createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
     createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 })
 ];
@@ -505,20 +501,25 @@ function processAWSData(data) {
             
             if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
 
-            // Updated buffer logic
-            var rawWarningLevel = String(station.RainfallLandslidethresholdwarninglevel).trim();
+            // Updated buffer logic based on warning level string
+            var rawWarningLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
             var warningLevel = parseInt(rawWarningLevel);
             var color = getBufferColor(warningLevel);
-            var isInactive = (rawWarningLevel === 'down' || rawWarningLevel === 'N/A' || rawWarningLevel === '#VALUE!');
             
-            if (isInactive) {
-                // Buffer is transparent, dash array turns white, no pulse circle
+            // Condition 1: 'down' -> Only display the logo. No buffers, no pulses.
+            if (rawWarningLevel === 'down') {
+                // Do nothing. The marker generation logic at the bottom of the loop will handle the logo.
+            } 
+            // Condition 2: 'N/A' or '#VALUE!' -> Display white dasharray buffer only, no pulse.
+            else if (rawWarningLevel === 'n/a' || rawWarningLevel === '#value!') {
                 var staticCircle = L.circle([lat, lng], {
                     color: 'white', fillColor: 'transparent', fillOpacity: 0,
                     radius: 20000, weight: 2, dashArray: '5, 10', interactive: false 
                 });
                 warningLayerGroup.addLayer(staticCircle);
-            } else if (color) {
+            } 
+            // Condition 3: Numeric warning level with a valid color -> Normal buffer and pulse
+            else if (color) {
                 var staticCircle = L.circle([lat, lng], {
                     color: color, fillColor: color, fillOpacity: 0.05,
                     radius: 20000, weight: 2, dashArray: '5, 10', interactive: false 
@@ -532,6 +533,7 @@ function processAWSData(data) {
                 warningLayerGroup.addLayer(pulseCircle);
             }
 
+            // Always display the station logo/marker regardless of the condition above
             var iconUrl = getStationIcon(station.StationName);
             var marker = L.marker([lat, lng], {
                 icon: L.icon({
