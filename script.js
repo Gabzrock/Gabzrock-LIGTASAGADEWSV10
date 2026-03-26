@@ -408,7 +408,8 @@ const layerPromises = [
     createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, className: 'flashing-high'}, null),
     createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.6, className: 'flashing-high' }),
     createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
-    createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 })
+    createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 }),
+    createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 1,})
 ];
 
 // --- 5. Controls Initialization ---
@@ -457,6 +458,14 @@ Promise.allSettled(layerPromises).then((results) => {
     try {
         const layerControl = L.control.layers(baseLayersData, overlays, { position: 'topright' }).addTo(map);
         initSidebarControls();
+        // --- ADD THESE LINES TO SHOW LAYERS ON LOAD ---
+        if (overlays['PH-Boundary: Boundary']) {
+            map.addLayer(overlays['PH-Boundary: Boundary']);
+        }
+        if (overlays['MGB-HIGH: Susceptibility']) {
+            map.addLayer(overlays['MGB-HIGH: Susceptibility']);
+        }
+        // ----------------------------------------------
     } catch (e) {
         console.error("Error initializing controls", e);
     }
@@ -602,7 +611,7 @@ setInterval(fetchAndRefreshData, 60000);
 // --- 7. Sidebar & Forecast (With Raster Support) ---
 
 const geojsonUrls = [
-'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin1.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin2.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin3.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin4.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin5.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin6.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin7.geojson',
+'https://raw.githubusercontent.com/Gabzrock/GE_experiments/refs/heads/main/ligtas_postwrf_d01_20230706_0000_f14300_rain_clipped.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin2.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin3.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin4.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin5.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin6.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day01_Bin7.geojson',
 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day02_Bin1.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day02_Bin2.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day02_Bin3.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day02_Bin4.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day02_Bin5.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day02_Bin6.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day02_Bin7.geojson',
 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day03_Bin1.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day03_Bin2.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day03_Bin3.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day03_Bin4.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day03_Bin5.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day03_Bin6.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day03_Bin7.geojson',
 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day04_Bin1.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day04_Bin2.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day04_Bin3.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day04_Bin4.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day04_Bin5.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day04_Bin6.geojson', 'https://raw.githubusercontent.com/Gabzrock/CRSS/refs/heads/main/Daily_RF_Day04_Bin7.geojson',
@@ -627,7 +636,7 @@ const colors = [
 
 // Raster Configuration with Placeholders
 const rasterForecastUrls = [
-    'https://placehold.co/800x600?text=Rainfall+Raster+Day+1',
+    'https://raw.githubusercontent.com/Gabzrock/GE_experiments/refs/heads/main/ligtas_postwrf_d01_20230706_0000_f14300_rain_clipped.geojson',
     'https://placehold.co/800x600?text=Rainfall+Raster+Day+2',
     'https://placehold.co/800x600?text=Rainfall+Raster+Day+3',
     'https://placehold.co/800x600?text=Rainfall+Raster+Day+4',
