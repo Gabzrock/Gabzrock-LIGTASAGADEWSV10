@@ -392,11 +392,11 @@ details > summary {
 }
 /* --- NEW: Flashing Animation for MGB-HIGH --- */
 @keyframes flash-warning {
-    0% { fill-opacity: 0.7; stroke-opacity: 1; }
+    0% { fill-opacity: 0.4; stroke-opacity: 1; }
     50% { fill-opacity: 0.1; stroke-opacity: 0.4; }
-    100% { fill-opacity: 0.7; stroke-opacity: 1; }
+    100% { fill-opacity: 0.4; stroke-opacity: 1; }
 }
 
 .flashing-high {
-    animation: flash-warning 1s infinite ease-in-out;
+    animation: flash-warning 3s infinite ease-in-out;
 }
