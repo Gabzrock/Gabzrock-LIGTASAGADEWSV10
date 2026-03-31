@@ -460,11 +460,12 @@ Promise.allSettled(layerPromises).then((results) => {
         const layerControl = L.control.layers(baseLayersData, overlays, { position: 'topright' }).addTo(map);
         initSidebarControls();
         // --- ADD THESE LINES TO SHOW LAYERS ON LOAD ---
-        if (overlays['MGB-HIGH: Susceptibility']) {
-            map.addLayer(overlays['MGB-HIGH: Susceptibility']);
-        }
+
         if (overlays['LIGTAS-AGAD sites: Boundary']) {
             map.addLayer(overlays['LIGTAS-AGAD sites: Boundary']);
+        }
+        if (overlays['MGB-HIGH: Susceptibility']) {
+            map.addLayer(overlays['MGB-HIGH: Susceptibility']);
         }
         // ----------------------------------------------
     } catch (e) {
