@@ -121,7 +121,7 @@ window.showImage = function(src, alt) {
 
 setTimeout(hideLoadingScreen, 10000); 
 
-// --- 2. UI Logic ---
+// --- 2. UI Logic & Property Formatting ---
 
 var cachedAWSData = []; 
 var landslideFeatures = []; 
@@ -143,16 +143,38 @@ updateClock();
 function Homebutton() { window.location.href = '';  }
 function AWSbutton() { window.location.href = 'https://gabzrock.github.io/LIGTAS-AGADLandslide-Warning-Advisories/'; }
 
-document.getElementById('overrideBtn').onclick = () => { 
-    const el = document.getElementById('errorOverride');
-    if(el) el.style.display = 'none'; 
-};
-document.getElementById('retryBtn').onclick = () => { location.reload(); };
+// Format Property Names (Handles ADM codes)
+function formatPropertyName(key) {
+    if (!key) return 'Unknown';
+    const k = String(key).toLowerCase().trim();
+
+    if (k === 'rating' || k.includes('suscept')) return 'Rating';
+    if (k === 'brgy' || k === 'barangay' || k === 'name_3' || k.includes('adm4')) return 'Barangay';
+    if (k.includes('area') || k === 'ha' || k.includes('hectare')) return 'Distance in hectares';
+    if (k === 'mun' || k === 'muni' || k.includes('municipali') || k === 'name_2' || k.includes('adm3')) return 'Municipality';
+    if (k === 'prov' || k.includes('province') || k === 'name_1' || k.includes('adm2')) return 'Province';
+    if (k === 'reg' || k === 'region' || k === 'name_0' || k.includes('adm1')) return 'Region';
+
+    return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+// Format Property Values
+function formatPropertyValue(key, value) {
+    if (value === null || value === undefined) return 'N/A';
+    const k = String(key).toLowerCase().trim();
+    const v = String(value).toLowerCase().trim();
+
+    if (k === 'rating' || k.includes('suscept')) {
+        if (v === 'high' || v.includes('high')) return 'High Susceptibility';
+        if (v === 'moderate' || v === 'med' || v.includes('mod')) return 'Moderate Susceptibility';
+        if (v === 'low' || v.includes('low')) return 'Low Susceptibility';
+    }
+    return value;
+}
 
 function updatePropertiesTable(layerName, properties) {
     const tableBody = document.getElementById('propertiesTableBody');
     if (!tableBody) return;
-    
     tableBody.innerHTML = ''; 
 
     if (!properties || Object.keys(properties).length === 0) {
@@ -162,14 +184,19 @@ function updatePropertiesTable(layerName, properties) {
 
     try {
         for (const [key, value] of Object.entries(properties)) {
-            const displayValue = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : value;
+            const kLower = String(key).toLowerCase().trim();
+            // Hide ugly GIS system fields
+            if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
+
+            const displayKey = formatPropertyName(key);
+            let displayValue = formatPropertyValue(key, value);
+            if (typeof displayValue === 'object' && displayValue !== null) displayValue = JSON.stringify(displayValue);
+
             const row = document.createElement('tr');
-            row.innerHTML = `<td><strong>${layerName}</strong></td><td>${key}</td><td>${displayValue}</td>`;
+            row.innerHTML = `<td><strong>${layerName}</strong></td><td>${displayKey}</td><td>${displayValue}</td>`;
             tableBody.appendChild(row);
         }
-    } catch (e) {
-        console.error("Error updating table", e);
-    }
+    } catch (e) { console.error("Error updating table", e); }
 }
 
 // --- 3. Map Initialization ---
@@ -246,29 +273,7 @@ const layerLogos = [
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/layer_layers_icon_193964.png'
 ];
 
-function findNearestStation(latlng) {
-    if (!cachedAWSData || cachedAWSData.length === 0) return null;
-    let nearest = null;
-    let minDist = Infinity;
-    
-    try {
-        cachedAWSData.forEach(station => {
-            const lat = parseFloat(station.Latitude);
-            const lng = parseFloat(station.Longitude);
-            if(isNaN(lat) || isNaN(lng)) return;
-
-            const slatlng = L.latLng(lat, lng);
-            const dist = latlng.distanceTo(slatlng);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = { ...station, distance: (dist / 1000).toFixed(2) }; 
-            }
-        });
-    } catch(e) { console.error("Error finding nearest station", e); }
-    return nearest;
-}
-
-// Station search prioritized by warning level within a set radius
+// Station search prioritized by warning level within a set 20km radius
 function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
     if (!cachedAWSData || cachedAWSData.length === 0) return null;
     
@@ -276,7 +281,6 @@ function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
     let highestWarningLevel = -1;
     let minDistanceForHighest = Infinity;
     
-    // Fallback variables in case no station is within the 20km radius
     let absoluteNearest = null;
     let absoluteMinDist = Infinity;
 
@@ -289,19 +293,16 @@ function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
             const slatlng = L.latLng(lat, lng);
             const distKm = latlng.distanceTo(slatlng) / 1000;
 
-            // Track absolute nearest as a fallback
             if (distKm < absoluteMinDist) {
                 absoluteMinDist = distKm;
                 absoluteNearest = { ...station, distance: distKm.toFixed(2) };
             }
 
-            // Check if within the relevant warning radius (20km)
             if (distKm <= maxRadiusKm) {
                 const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
                 let level = parseInt(rawLevel);
-                if (isNaN(level)) level = 0; // Treat text like 'down' or 'n/a' as level 0
+                if (isNaN(level)) level = 0; 
 
-                // Prioritize highest warning level; if tied, pick the closer station
                 if (level > highestWarningLevel || (level === highestWarningLevel && distKm < minDistanceForHighest)) {
                     highestWarningLevel = level;
                     minDistanceForHighest = distKm;
@@ -311,7 +312,6 @@ function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
         });
     } catch(e) { console.error("Error finding priority station", e); }
     
-    // Return the highest-level station nearby, or the absolute closest if none are nearby
     return priorityStation || absoluteNearest;
 }
 
@@ -324,9 +324,7 @@ function getNearbyLandslideCount(latlng, radiusKm = 5) {
             const coords = feature.geometry.coordinates; 
             const lLatLng = L.latLng(coords[1], coords[0]);
             const distance = latlng.distanceTo(lLatLng); 
-            if (distance <= (radiusKm * 1000)) {
-                count++;
-            }
+            if (distance <= (radiusKm * 1000)) { count++; }
         }
     });
     return count;
@@ -335,11 +333,16 @@ function getNearbyLandslideCount(latlng, radiusKm = 5) {
 function generateCombinedReport(layerName, properties, nearestStation, landslideCount) {
     let susContent = '';
     for (const [key, value] of Object.entries(properties)) {
-        let displayValue = value;
-        if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('www'))) {
-             displayValue = `<a href="${value}" target="_blank" style="color:var(--primary-color); text-decoration:none; font-weight:bold;">View Link 🔗</a>`;
+        const kLower = String(key).toLowerCase().trim();
+        if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
+
+        const displayKey = formatPropertyName(key);
+        let displayValue = formatPropertyValue(key, value);
+
+        if (typeof displayValue === 'string' && (displayValue.startsWith('http') || displayValue.startsWith('www'))) {
+             displayValue = `<a href="${displayValue}" target="_blank" style="color:var(--primary-color); text-decoration:none; font-weight:bold;">View Link 🔗</a>`;
         }
-        susContent += `<tr><th>${key}</th><td>${displayValue}</td></tr>`;
+        susContent += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
     }
 
     let stationContent = '<tr><td colspan="2">No AWS Data Available</td></tr>';
@@ -414,17 +417,24 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
                     let popupRows = '';
                     if (feature.properties) {
                         for (const [key, value] of Object.entries(feature.properties)) {
-                            let displayValue = value;
-                            if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('https') || value.startsWith('www'))) {
-                                displayValue = `<a href="${value}" target="_blank" style="color:blue; text-decoration:underline;">View Link</a>`;
+                            const kLower = String(key).toLowerCase().trim();
+                            if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
+
+                            const displayKey = formatPropertyName(key);
+                            let displayValue = formatPropertyValue(key, value);
+
+                            if (typeof displayValue === 'string' && (displayValue.startsWith('http') || displayValue.startsWith('https') || displayValue.startsWith('www'))) {
+                                displayValue = `<a href="${displayValue}" target="_blank" style="color:blue; text-decoration:underline;">View Link</a>`;
                             }
-                            popupRows += `<tr><th>${key}</th><td>${displayValue}</td></tr>`;
+                            popupRows += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
                         }
                     }
                     
+                    const displayTitle = styleOptions.customPopupName || name;
+                    
                     const popupContent = `
                         <div class="popup-container">
-                            <div class="popup-header">${name}</div>
+                            <div class="popup-header">${displayTitle}</div>
                             <div class="popup-scroll-container">
                                 <table class="popup-table">${popupRows}</table>
                             </div>
@@ -434,11 +444,11 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
                     layer.bindPopup(popupContent);
 
                     layer.on('click', (e) => { 
-                        updatePropertiesTable(name, feature.properties);
+                        updatePropertiesTable(displayTitle, feature.properties);
                         if (name.includes('MGB') || name.includes('Susceptibility')) {
                             const priorityStation = findPriorityStationNearby(e.latlng, 20); 
                             const lsCount = getNearbyLandslideCount(e.latlng, 5); 
-                            const reportContent = generateCombinedReport(name, feature.properties, priorityStation, lsCount);
+                            const reportContent = generateCombinedReport(displayTitle, feature.properties, priorityStation, lsCount);
                             L.popup().setLatLng(e.latlng).setContent(reportContent).openOn(map);
                         }
                     });
@@ -455,14 +465,114 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
 
 const layerPromises = [
     createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, className: 'flashing-high'}, null),
-    createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.1,weight: 0.7}),
-    createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6}),
+    createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.1, weight: 0.7, customPopupName: 'High Landslide Risk Area' }),
+    createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
     createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 }),
     createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 0.2,}),
-     createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2})
+    createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2,})
 ];
 
-// --- 5. Controls Initialization ---
+// --- 5. Synchronized AWS GeoJSON Layers ---
+
+// CHANGED: This is now an array to allow MULTIPLE files per AWS, or multiple different AWS files entirely.
+let synchronizedLayers = []; 
+
+/**
+ * Initializes a GeoJSON layer and tags it to a specific AWS station name.
+ */
+function initSynchronizedAWSLayer(targetAwsName, geojsonUrl, layerDisplayName) {
+    fetch(geojsonUrl)
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            const layer = L.geoJSON(data, {
+                style: { color: '#808080', weight: 4, opacity: 0.8 } // Default grey until AWS data loads
+            }).addTo(map);
+
+            // Push to the array so multiple layers can co-exist
+            synchronizedLayers.push({
+                targetAws: targetAwsName,
+                layer: layer,
+                name: layerDisplayName
+            });
+            
+            overlays[layerDisplayName] = layer;
+            if (typeof initSidebarControls === 'function') initSidebarControls();
+        })
+        .catch(err => console.error(`Error loading synced layer ${layerDisplayName}:`, err));
+}
+
+/**
+ * Updates the color of all synchronized layers based on current cachedAWSData.
+ */
+function syncAwsLayersWithData() {
+    if (!cachedAWSData || cachedAWSData.length === 0) return;
+
+    // Loop through ALL synchronized layers in the array
+    synchronizedLayers.forEach(layerData => {
+        const station = cachedAWSData.find(s => {
+            const sName = String(s.StationName || s.Station || '').toLowerCase();
+            return sName.includes(layerData.targetAws.toLowerCase());
+        });
+
+        if (station) {
+            const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
+            let warningLevel = parseInt(rawLevel);
+            let targetColor = '#808080'; 
+
+            if (warningLevel === 1) targetColor = 'yellow';
+            else if (warningLevel === 2) targetColor = 'orange';
+            else if (warningLevel === 3) targetColor = 'red';
+            else if (warningLevel === 0 || rawLevel === '0') targetColor = 'green'; 
+
+            layerData.layer.setStyle({ color: targetColor, weight: 0.7, opacity: 0.9, dashArray: '5, 10'});
+
+        }
+    });
+}
+
+// =======================================================================
+// Add as many synced layers as you want right here!
+// The script will update all of them automatically when AWS data changes.
+// =======================================================================
+
+// Example 1: Buguias Road Network
+initSynchronizedAWSLayer(
+    'Buguias', 
+    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_BUGUIAS_AWS.geojson',
+    'Buguias AWS'
+);
+initSynchronizedAWSLayer(
+    'Mankayan', 
+    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_MANKAYAN_AWS.geojson',
+    'Mankayan AWS'
+);
+initSynchronizedAWSLayer(
+    'Bokod', 
+    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_BOKOD_AWS.geojson',
+    'Bokod AWS'
+);
+initSynchronizedAWSLayer(
+    'Itogon', 
+    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_ITOGON_AWS.geojson',
+    'Itogon AWS'
+);
+initSynchronizedAWSLayer(
+    'Landgrant', 
+    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_LANDGRANT_AWS.geojson',
+    'Landgrant AWS'
+);
+
+// Example 2: You can add another file for Buguias if needed
+// initSynchronizedAWSLayer('Buguias', 'URL_TO_ANOTHER_GEOJSON', 'Buguias Bridges');
+
+// Example 3: You can add files for completely different AWS stations
+// initSynchronizedAWSLayer('Mankayan', 'URL_TO_MANKAYAN_GEOJSON', 'Mankayan Zones');
+
+
+// --- 6. Controls Initialization ---
 
 const LegendControl = L.Control.extend({
     options: { position: 'bottomright' },
@@ -520,7 +630,7 @@ Promise.allSettled(layerPromises).then((results) => {
     }
 });
 
-// --- 6. Data Fetching & Processing ---
+// --- 7. Data Fetching & Processing ---
 
 const warningLayerGroup = L.layerGroup().addTo(map);
 const googleSheetCSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSosfBP3StMyRUzwI0tUZPsLjPVH1zePCz8gZbTMOzjOvnonbmNCoy5VT46UxO0qdqb-Wm9EqTpXp8y/pub?gid=470430875&single=true&output=csv';
@@ -552,6 +662,9 @@ function processAWSData(data) {
     cachedAWSData = data; 
     warningLayerGroup.clearLayers(); 
 
+    // TRIGGER SYNCED LAYERS UPDATE
+    syncAwsLayersWithData();
+
     data.forEach(station => {
         try {
             var lat = parseFloat(station.Latitude);
@@ -559,16 +672,13 @@ function processAWSData(data) {
             
             if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return;
 
-            // Updated buffer logic based on warning level string
             var rawWarningLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
             var warningLevel = parseInt(rawWarningLevel);
             var color = getBufferColor(warningLevel);
             
-            // Condition 1: 'down' -> Only display the logo. No buffers, no pulses.
             if (rawWarningLevel === 'down') {
-                // Do nothing. The marker generation logic at the bottom of the loop will handle the logo.
+                // Do nothing
             } 
-            // Condition 2: 'N/A' or '#VALUE!' -> Display white dasharray buffer only, no pulse.
             else if (rawWarningLevel === 'n/a' || rawWarningLevel === '#value!') {
                 var staticCircle = L.circle([lat, lng], {
                     color: 'white', fillColor: 'transparent', fillOpacity: 0,
@@ -576,7 +686,6 @@ function processAWSData(data) {
                 });
                 warningLayerGroup.addLayer(staticCircle);
             } 
-            // Condition 3: Numeric warning level with a valid color -> Normal buffer and pulse
             else if (color) {
                 var staticCircle = L.circle([lat, lng], {
                     color: color, fillColor: color, fillOpacity: 0.05,
@@ -659,7 +768,7 @@ function fetchAndRefreshData() {
 fetchAndRefreshData();
 setInterval(fetchAndRefreshData, 60000);
 
-// --- 7. Sidebar & Forecast (With Raster Support) ---
+// --- 8. Sidebar & Forecast (With Raster Support) ---
 
 const geojsonUrls = [
 'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_007-012_Bin5_50-100.geojson'	,
@@ -713,10 +822,8 @@ const colors = [
    'yellow', 'orange', 'red',
    'yellow', 'orange', 'red',
    'yellow', 'orange', 'red'
-
 ];
 
-// Raster Configuration with Placeholders
 const rasterForecastUrls = [
     'https://raw.githubusercontent.com/Gabzrock/GE_experiments/refs/heads/main/ligtas_postwrf_d01_20230706_0000_f14300_rain_clipped.geojson',
     'https://placehold.co/800x600?text=Rainfall+Raster+Day+2',
@@ -767,7 +874,6 @@ function updateRaster(index) {
 
     const imageUrl = rasterForecastUrls[index % rasterForecastUrls.length];
     
-    // Add Raster with Error Handling
     currentRasterLayer = L.imageOverlay(imageUrl, rasterBounds, {
         opacity: 0.6,
         interactive: true,
@@ -854,13 +960,11 @@ document.getElementById('prevBtn').onclick = () => {
     showGroup(currentGroupIndex);
 };
 
-// --- FIX: SIDEBAR CONTROLS ---
 function initSidebarControls() {
     const container = document.getElementById('layerControls');
     if (!container) return;
     container.innerHTML = ''; 
 
-    // Helper to create checkbox
     function createToggle(id, label, layerObj, onChangeOverride) {
         const div = document.createElement('div');
         div.className = 'layer-item';
@@ -868,9 +972,8 @@ function initSidebarControls() {
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.id = id;
-        input.className = 'layer-toggle-input'; // Add class for querying if needed
+        input.className = 'layer-toggle-input';
         
-        // Initial State
         if (layerObj) {
             input.checked = map.hasLayer(layerObj);
         }
@@ -893,22 +996,18 @@ function initSidebarControls() {
         return input;
     }
 
-    // Generate toggles for Overlays
     Object.keys(overlays).forEach((name, idx) => {
         const layer = overlays[name];
         const input = createToggle('toggle_overlay_' + idx, name, layer);
         
-        // Keep UI in sync with map events
         map.on('layeradd', (e) => { if(e.layer === layer) input.checked = true; });
         map.on('layerremove', (e) => { if(e.layer === layer) input.checked = false; });
     });
 
-    // Warning Layer Toggle
     const warnInput = createToggle('toggle_warning', '20-KM Warning & AWS', warningLayerGroup);
     map.on('layeradd', (e) => { if(e.layer === warningLayerGroup) warnInput.checked = true; });
     map.on('layerremove', (e) => { if(e.layer === warningLayerGroup) warnInput.checked = false; });
 
-    // Raster Toggle
     createToggle('toggle_raster', 'Show Raster Forecast', null, (checked) => {
         showRaster = checked;
         if (checked) updateRaster(currentGroupIndex); 
@@ -916,16 +1015,12 @@ function initSidebarControls() {
     });
 }
 
-// FIX: GLOBAL BUTTONS LOGIC
-// Re-bind click handlers to ensure they reference the latest objects
 const addAllBtn = document.getElementById('addAllBtn');
 if (addAllBtn) {
     addAllBtn.onclick = () => {
-        // Add all Overlays
         Object.values(overlays).forEach(layer => {
             if (!map.hasLayer(layer)) map.addLayer(layer);
         });
-        // Add Warning Layer
         if (!map.hasLayer(warningLayerGroup)) map.addLayer(warningLayerGroup);
     };
 }
@@ -933,11 +1028,9 @@ if (addAllBtn) {
 const removeAllBtn = document.getElementById('removeAllBtn');
 if (removeAllBtn) {
     removeAllBtn.onclick = () => {
-        // Remove all Overlays
         Object.values(overlays).forEach(layer => {
             if (map.hasLayer(layer)) map.removeLayer(layer);
         });
-        // Remove Warning Layer
         if (map.hasLayer(warningLayerGroup)) map.removeLayer(warningLayerGroup);
     };
 }
