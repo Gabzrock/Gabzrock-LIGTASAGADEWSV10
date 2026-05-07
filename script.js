@@ -149,7 +149,6 @@ document.getElementById('overrideBtn').onclick = () => {
 };
 document.getElementById('retryBtn').onclick = () => { location.reload(); };
 
-
 function updatePropertiesTable(layerName, properties) {
     const tableBody = document.getElementById('propertiesTableBody');
     if (!tableBody) return;
@@ -269,6 +268,53 @@ function findNearestStation(latlng) {
     return nearest;
 }
 
+// Station search prioritized by warning level within a set radius
+function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
+    if (!cachedAWSData || cachedAWSData.length === 0) return null;
+    
+    let priorityStation = null;
+    let highestWarningLevel = -1;
+    let minDistanceForHighest = Infinity;
+    
+    // Fallback variables in case no station is within the 20km radius
+    let absoluteNearest = null;
+    let absoluteMinDist = Infinity;
+
+    try {
+        cachedAWSData.forEach(station => {
+            const lat = parseFloat(station.Latitude);
+            const lng = parseFloat(station.Longitude);
+            if(isNaN(lat) || isNaN(lng)) return;
+
+            const slatlng = L.latLng(lat, lng);
+            const distKm = latlng.distanceTo(slatlng) / 1000;
+
+            // Track absolute nearest as a fallback
+            if (distKm < absoluteMinDist) {
+                absoluteMinDist = distKm;
+                absoluteNearest = { ...station, distance: distKm.toFixed(2) };
+            }
+
+            // Check if within the relevant warning radius (20km)
+            if (distKm <= maxRadiusKm) {
+                const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
+                let level = parseInt(rawLevel);
+                if (isNaN(level)) level = 0; // Treat text like 'down' or 'n/a' as level 0
+
+                // Prioritize highest warning level; if tied, pick the closer station
+                if (level > highestWarningLevel || (level === highestWarningLevel && distKm < minDistanceForHighest)) {
+                    highestWarningLevel = level;
+                    minDistanceForHighest = distKm;
+                    priorityStation = { ...station, distance: distKm.toFixed(2) };
+                }
+            }
+        });
+    } catch(e) { console.error("Error finding priority station", e); }
+    
+    // Return the highest-level station nearby, or the absolute closest if none are nearby
+    return priorityStation || absoluteNearest;
+}
+
 function getNearbyLandslideCount(latlng, radiusKm = 5) {
     if (!landslideFeatures || landslideFeatures.length === 0) return 0;
     let count = 0;
@@ -306,6 +352,9 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
             <tr><th>Distance</th><td>${nearestStation.distance} km</td></tr>
             <tr><th>Warning Level</th><td style="background-color:${color}; font-weight:bold;">Level ${wLevel}</td></tr>
             <tr><th>Rainfall (24h)</th><td>${nearestStation.R24H || nearestStation.Rainfall || '0'} mm</td></tr>
+            <tr><th>Latitude</th><td>${nearestStation.Latitude || 'N/A'}</td></tr>
+            <tr><th>Longitude</th><td>${nearestStation.Longitude || 'N/A'}</td></tr>
+            <tr><th>Elevation</th><td>${nearestStation.Elevation ? nearestStation.Elevation + ' m' : 'N/A'}</td></tr>
             <tr><th>Rec. Actions</th><td>${nearestStation.Recommendedactions || 'Monitor'}</td></tr>
         `;
     }
@@ -387,9 +436,9 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
                     layer.on('click', (e) => { 
                         updatePropertiesTable(name, feature.properties);
                         if (name.includes('MGB') || name.includes('Susceptibility')) {
-                            const nearest = findNearestStation(e.latlng);
+                            const priorityStation = findPriorityStationNearby(e.latlng, 20); 
                             const lsCount = getNearbyLandslideCount(e.latlng, 5); 
-                            const reportContent = generateCombinedReport(name, feature.properties, nearest, lsCount);
+                            const reportContent = generateCombinedReport(name, feature.properties, priorityStation, lsCount);
                             L.popup().setLatLng(e.latlng).setContent(reportContent).openOn(map);
                         }
                     });
@@ -406,13 +455,11 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
 
 const layerPromises = [
     createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, className: 'flashing-high'}, null),
-    createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.6, className: 'flashing-high' }),
-    createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
+    createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.1,weight: 0.7}),
+    createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6}),
     createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 }),
-    createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 1,}),
-    createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 1,}),
-    createGeoJSONLayer('Quezon-Province', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites_QuezonProvince.json', { color: 'orange', fillOpacity: 0.1, weight: 1,})
-
+    createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 0.2,}),
+     createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2})
 ];
 
 // --- 5. Controls Initialization ---
@@ -461,7 +508,6 @@ Promise.allSettled(layerPromises).then((results) => {
     try {
         const layerControl = L.control.layers(baseLayersData, overlays, { position: 'topright' }).addTo(map);
         initSidebarControls();
-        // --- ADD THESE LINES TO SHOW LAYERS ON LOAD ---
 
         if (overlays['LIGTAS-AGAD sites: Boundary']) {
             map.addLayer(overlays['LIGTAS-AGAD sites: Boundary']);
@@ -469,7 +515,6 @@ Promise.allSettled(layerPromises).then((results) => {
         if (overlays['MGB-HIGH: Susceptibility']) {
             map.addLayer(overlays['MGB-HIGH: Susceptibility']);
         }
-        // ----------------------------------------------
     } catch (e) {
         console.error("Error initializing controls", e);
     }
@@ -546,7 +591,6 @@ function processAWSData(data) {
                 warningLayerGroup.addLayer(pulseCircle);
             }
 
-            // Always display the station logo/marker regardless of the condition above
             var iconUrl = getStationIcon(station.StationName);
             var marker = L.marker([lat, lng], {
                 icon: L.icon({
@@ -561,6 +605,9 @@ function processAWSData(data) {
                         <table class="popup-table">
                             <tr><th>Status</th><td>${station.Status || 'N/A'}</td></tr>
                             <tr><th>Location</th><td>${station.LocationDetails || station.Municipality || 'N/A'}</td></tr>
+                            <tr><th>Latitude</th><td>${station.Latitude || 'N/A'}</td></tr>
+                            <tr><th>Longitude</th><td>${station.Longitude || 'N/A'}</td></tr>
+                            <tr><th>Elevation</th><td>${station.Elevation ? station.Elevation + ' m' : 'N/A'}</td></tr>
                             <tr><th>Rainfall (Total)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
                             <tr><th>Warning Level</th><td>${station.RainfallLandslidethresholdwarninglevel || '0'}</td></tr>
                             <tr><th>Description</th><td>${station.Rainfalldescription || 'N/A'}</td></tr>
