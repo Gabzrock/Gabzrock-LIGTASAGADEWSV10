@@ -717,7 +717,7 @@ function processAWSData(data) {
                             <tr><th>Latitude</th><td>${station.Latitude || 'N/A'}</td></tr>
                             <tr><th>Longitude</th><td>${station.Longitude || 'N/A'}</td></tr>
                             <tr><th>Elevation</th><td>${station.Elevation ? station.Elevation + ' m' : 'N/A'}</td></tr>
-                            <tr><th>Rainfall (Total)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
+                            <tr><th>Rainfall (7-day Accumulation)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
                             <tr><th>Warning Level</th><td>${station.RainfallLandslidethresholdwarninglevel || '0'}</td></tr>
                             <tr><th>Description</th><td>${station.Rainfalldescription || 'N/A'}</td></tr>
                             <tr><th>Scenario</th><td>${station.Possiblescenario || 'N/A'}</td></tr>
