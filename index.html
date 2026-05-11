@@ -1,103 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
-
-  <head>
-    <meta charset="UTF-8">
-    <title>LIGTAS-RILEWSv10</title>
-    <link rel="stylesheet" href="./style.css">
-
-  </head>
-    
-  <body>
-  <!DOCTYPE html>
-<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIGTAS-RILEWSV3 | Landslide Warning Map</title>
+    <title>LIGTAS-AGAD RILEWS | Rainfall-Induced Landslide Early Warning System</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-search@3.0.2/dist/leaflet-search.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     
     <link rel="stylesheet" href="./style.css">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-search@3.0.2/dist/leaflet-search.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 </head>
 <body>
-
-    <div id="loading-screen">
-        <div class="logo">
-            <img src="https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/LIGTAS.png" alt="Logo" width="100" height="100">
-        </div>
-        <div class="loading-text">Rainfall-Induced Landslide Early Warning System (RILEWS)</div>
-        <div class="spinner"></div>
-        <div class="progress-container">
-            <div class="progress-bar"></div>
+    
+    <div id="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logos">
+                <img src="https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png" alt="LIGTAS Logo">
+            </div>
+            <h1>LIGTAS-AGAD RILEWS</h1>
+            <p>Landslide Warning and Advisory Map</p>
+            <div class="splash-spinner"></div>
+            <h3 id="splash-message">Initializing System & Loading Map Data...</h3>
         </div>
     </div>
 
-    <header id="header2">
-        <div class="header-title">
-            LIGTAS-AGAD RILEWS
-        </div>
-        <div class="header-controls">
-            <div id="real-time">Initializing...</div>
-            <button class="btn" onclick="Homebutton()">Home</button>
-            <button class="btn" onclick="AWSbutton()">Landslide Warning Advisories</button>
-            <button class="btn btn-primary" id="toggle-buffer">20-KM Warning</button>
-        </div>
-    </header>
+    <div id="errorOverride"><span id="errorMessage"></span></div>
 
-    <div id="errorOverride" style="display:none;">
-        <span id="errorMessage">Some layers failed to load.</span>
-        <button id="overrideBtn">Dismiss</button> 
-        <button id="retryBtn">Retry</button>
+    <div id="header2">
+        <div class="header-left">
+            <img src="https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png" alt="LIGTAS Logo" class="header-logo">
+            <div class="header-title">LIGTAS-AGAD RILEWS | Rainfall-Induced Landslide Early Warning System</div>
+        </div>
+        <span id="real-time" class="desktop-clock"></span>
+        <button class="hamburger-btn" id="hamburgerBtn">☰</button>
     </div>
 
-    <div id="map-container">
-        <nav id="navbar">
-            <details open>
-                <summary>Map Controls</summary>
-                
-                <div class="control-group">
-                    <h5>Weather Forecast (PAGASA WRF)</h5>
-                     <h5>Feature not yet available (under development)</h5>
+    <div id="subheader" class="header-controls">
+        <span id="real-time-mobile" class="mobile-clock"></span>
+        
+        <div class="button-group-container">
+            <span class="group-label">SYSTEM</span>
+            <div class="button-pod">
+                <button class="nav-btn" onclick="Homebutton()">🏠 Home</button>
+                <button class="nav-btn" onclick="window.open('YOUR_DETECT_URL_HERE', '_blank')">🔍 Detect</button>
+                <button class="nav-btn" onclick="window.open('YOUR_ABOUT_URL_HERE', '_blank')">ℹ️ About</button>
+            </div>
+        </div>
 
-                    <div class="playback-controls">
-                        <button id="prevBtn">Prev</button>
-                        <button id="playBtn">Play</button>
-                        <button id="pauseBtn">Pause</button>
-                        <button id="stopBtn">Stop</button>
-                        <button id="nextBtn">Next</button>
-                    </div>
-                    <div style="text-align: center; margin: 5px 0; font-weight: bold;">
-                        <span id="currentGroup">Day: 1</span>
-                    </div>
-                    <div id="speedControl">
-                        <label for="speedSlider">Speed:</label>
-                        <input type="range" id="speedSlider" min="1" max="10" value="5" step="1">
-                        <span id="speedValue">5s</span>
-                    </div>
-                </div>
-              <hr>
-                <div class="control-group">
-                    <h5>Global Layer Controls</h5>
-                    <button class="btn" style="background:var(--primary-color); width:100%; margin-bottom:5px;" id="addAllBtn">Show All Layers</button>
-                    <button class="btn" style="background:#d9534f; width:100%;" id="removeAllBtn">Hide All Layers</button>
-                    
-                    <div id="layerControls" style="margin-top: 10px;">
-                        </div>
-                </div>
-            </details>
-        </nav>
+        <div class="button-group-container">
+            <span class="group-label">TOOLS</span>
+            <div class="button-pod">
+                <button class="nav-btn btn-warning" id="assessLocationBtn">Assess my Location</button>
+                <button class="nav-btn" id="toggleEffectsBtn">Layer Effects</button>
+            </div>
+        </div>
 
+        <div class="button-group-container">
+            <span class="group-label">DATA</span>
+            <div class="button-pod">
+                <button class="nav-btn btn-danger" id="toggle-buffer">⭕ AWS Warning</button>
+                <button class="nav-btn" onclick="AWSbutton()">📊 Landslide Warning Advisories</button>
+            </div>
+        </div>
+
+        <div class="button-group-container">
+            <span class="group-label">VIEWS</span>
+            <div class="button-pod">
+                <button class="nav-btn" id="openLegendBtn">🗺️ Legend</button>
+                <button class="nav-btn" id="openControlsBtn">⚙️ Layer controls</button>
+                <button class="nav-btn" id="openPropertiesBtn">📋 Properties</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="map-panel-container">
         <div id="map"></div>
+    </div>
 
-        <div id="propertiesContainer">
-            <details open>
-                <summary>Feature Properties Table</summary>
+    <div id="legendModal" class="ui-modal">
+        <div class="ui-modal-content" style="max-width: 400px;">
+            <span class="close-ui-modal" id="closeLegendBtn">&times;</span>
+            <h3>🗺️ Map Legend</h3>
+            <div class="panel-content" id="legendModalContent">
+                </div>
+        </div>
+    </div>
+
+    <div id="controlsModal" class="ui-modal">
+        <div class="ui-modal-content">
+            <span class="close-ui-modal" id="closeControlsBtn">&times;</span>
+            <h3>⚙️ Map Controls & Forecast</h3>
+            <div class="panel-content">
+                <h4>Global Layers</h4>
+                <div class="layer-actions">
+                    <button id="loadAllLayersBtn">Load All</button>
+                    <button id="unloadAllLayersBtn">Unload All</button>
+                    <button id="defaultLayersBtn">Default</button>
+                </div>
+                <div id="layerControls"></div>
+                <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ddd;">
+                <h4>Raster Forecast</h4>
+                <div class="forecast-controls">
+                    <div id="currentGroup">Day: 1</div>
+                    <div class="btn-group">
+                        <button id="prevBtn">⏪</button>
+                        <button id="playBtn">▶️ Play</button>
+                        <button id="pauseBtn">⏸️</button>
+                        <button id="stopBtn">⏹️</button>
+                        <button id="nextBtn">⏩</button>
+                    </div>
+                    <div class="slider-container">
+                        <label>Speed: <span id="speedValue">5s</span></label>
+                        <input type="range" id="speedSlider" min="1" max="10" value="5">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="propertiesModal" class="ui-modal">
+        <div class="ui-modal-content" style="max-width: 500px;">
+            <span class="close-ui-modal" id="closePropertiesBtn">&times;</span>
+            <h3>📋 Feature Properties</h3>
+            <div class="panel-content">
                 <table id="propertiesTable">
                     <thead>
                         <tr>
@@ -110,7 +144,7 @@
                         <tr><td colspan="3" style="text-align:center; padding:20px; color:#666;">Click on a map feature to view details here.</td></tr>
                     </tbody>
                 </table>
-            </details>
+            </div>
         </div>
     </div>
 
@@ -120,15 +154,6 @@
         <div id="caption"></div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet-search@3.0.2/dist/leaflet-search.min.js"></script>
     <script src="./script.js"></script>
-
 </body>
-</html>
-    <script  src="./script.js"></script>
-
-  </body>
-  
 </html>
