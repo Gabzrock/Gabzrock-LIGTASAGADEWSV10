@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIGTAS-AGAD RILEWS | Rainfall-Induced Landslide Early Warning System</title>
+    <title>LIGTAS-AGAD RILEWS | Rainfall-Induced Landslide Early Warning System
+</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.css" />
@@ -18,6 +19,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     
@@ -26,7 +28,7 @@
             <div class="splash-logos">
                 <img src="https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png" alt="LIGTAS Logo">
             </div>
-            <h1>LIGTAS-AGAD RILEWS</h1>
+            <h1>LIGTAS-AGAD RIILEWS</h1>
             <p>Landslide Warning and Advisory Map</p>
             <div class="splash-spinner"></div>
             <h3 id="splash-message">Initializing System & Loading Map Data...</h3>
@@ -38,7 +40,7 @@
     <div id="header2">
         <div class="header-left">
             <img src="https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png" alt="LIGTAS Logo" class="header-logo">
-            <div class="header-title">LIGTAS-AGAD RILEWS | Rainfall-Induced Landslide Early Warning System</div>
+            <div class="header-title">LIGTAS-AGAD | Rainfall-Induced Landslide Early Warning System(RILEWS)</div>
         </div>
         <span id="real-time" class="desktop-clock"></span>
         <button class="hamburger-btn" id="hamburgerBtn">☰</button>
@@ -51,6 +53,7 @@
             <span class="group-label">SYSTEM</span>
             <div class="button-pod">
                 <button class="nav-btn" onclick="Homebutton()">🏠 Home</button>
+                <button class="nav-btn" onclick="window.open('YOUR_DETECT_URL_HERE', '_blank')">🔍 Detect</button>
                 <button class="nav-btn" onclick="window.open('YOUR_ABOUT_URL_HERE', '_blank')">ℹ️ About</button>
             </div>
         </div>
@@ -58,8 +61,8 @@
         <div class="button-group-container">
             <span class="group-label">TOOLS</span>
             <div class="button-pod">
-                <button class="nav-btn btn-warning" id="assessLocationBtn">Assess my Location</button>
-                <button class="nav-btn" id="toggleEffectsBtn">Layer Effects</button>
+                <button class="nav-btn btn-warning" id="assessLocationBtn">📍 Assess Location</button>
+                <button class="nav-btn" id="toggleEffectsBtn">✨ Effects</button>
             </div>
         </div>
 
@@ -67,16 +70,18 @@
             <span class="group-label">DATA</span>
             <div class="button-pod">
                 <button class="nav-btn btn-danger" id="toggle-buffer">⭕ AWS Warning</button>
-                <button class="nav-btn" onclick="AWSbutton()">📊 Landslide Warning Advisories</button>
+                <button class="nav-btn" onclick="AWSbutton()">📊 Landslide Advisories</button>
+                <button class="nav-btn btn-success" id="openAllStationsGraphBtn">📈 AWS Data</button>
             </div>
         </div>
 
         <div class="button-group-container">
             <span class="group-label">VIEWS</span>
             <div class="button-pod">
+                <button class="nav-btn" id="toggleDarkModeBtn">🌙 Dark Mode</button>
                 <button class="nav-btn" id="openLegendBtn">🗺️ Legend</button>
-                <button class="nav-btn" id="openControlsBtn">⚙️ Layer controls</button>
-                <button class="nav-btn" id="openPropertiesBtn">📋 Properties</button>
+                <button class="nav-btn" id="openControlsBtn">⚙️ Layer Controls</button>
+                <button class="nav-btn" id="openPropertiesBtn">📋 Feature Properties</button>
             </div>
         </div>
     </div>
@@ -97,7 +102,7 @@
     <div id="controlsModal" class="ui-modal">
         <div class="ui-modal-content">
             <span class="close-ui-modal" id="closeControlsBtn">&times;</span>
-            <h3>⚙️ Map Controls & Forecast</h3>
+            <h3>⚙️ Layer Controls</h3>
             <div class="panel-content">
                 <h4>Global Layers</h4>
                 <div class="layer-actions">
@@ -143,6 +148,26 @@
                         <tr><td colspan="3" style="text-align:center; padding:20px; color:#666;">Click on a map feature to view details here.</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="allStationsGraphModal" class="ui-modal">
+        <div class="ui-modal-content" style="max-width: 800px; width: 95%;">
+            <span class="close-ui-modal" id="closeAllStationsGraphBtn">&times;</span>
+            <h3>📊 Data from all stations</h3>
+            <p style="text-align: center; font-size: 0.95rem; color: #666; margin-bottom: 10px;">
+                Current Total Rainfall (mm) | <strong><span id="awsTotalCount">0</span> Stations Online</strong>
+            </p>
+            
+            <div class="panel-content chart-scroll-wrapper" style="width: 100%; overflow-x: auto; overflow-y: hidden; border: 1px solid #eee; border-radius: 4px; padding: 10px 0;">
+                <div id="chartAreaContainer" style="height: 380px; position: relative;">
+                    <canvas id="allStationsChart"></canvas>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+                <button id="downloadGraphBtn" class="nav-btn btn-success" style="padding: 8px 25px; font-size: 1rem;">⬇️ Download Graph as Image</button>
             </div>
         </div>
     </div>
