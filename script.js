@@ -117,7 +117,7 @@ function updateClock() {
 }
 setInterval(updateClock, 1000); updateClock(); 
 
-function Homebutton() { window.location.href = '';  }
+function Homebutton() { window.location.href = 'https://ligtas.uplb.edu.ph/LIGTAS-AGAD_new_portal-main/';  }
 function AWSbutton() { window.location.href = 'https://gabzrock.github.io/LIGTAS-AGADLandslide-Warning-Advisories/'; }
 
 function formatPropertyName(key) {
@@ -201,17 +201,16 @@ try {
         });
         map.addControl(drawControl);
 
-map.on(L.Draw.Event.CREATED, function (event) {
+        // Standard Drawing Event with Elevation Logic
+        map.on(L.Draw.Event.CREATED, function (event) {
             const layer = event.layer;
             const type = event.layerType;
 
-            // If the user drew a marker, grab coordinates and fetch elevation
             if (type === 'marker') {
                 const latlng = layer.getLatLng();
                 const lat = latlng.lat.toFixed(5);
                 const lng = latlng.lng.toFixed(5);
                 
-                // 1. Show the popup immediately with a "Fetching" loading state
                 const initialPopup = `
                     <div style="text-align:center; font-family:inherit; min-width: 160px;">
                         <strong style="color:var(--primary-color); font-size:1.1rem;">📍 Location Pin</strong>
@@ -226,13 +225,10 @@ map.on(L.Draw.Event.CREATED, function (event) {
                 drawnItems.addLayer(layer);
                 layer.openPopup();
 
-                // 2. Request topographic elevation data in the background
                 fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`)
                     .then(response => response.json())
                     .then(data => {
                         const elevation = data.results[0].elevation;
-                        
-                        // 3. Update the popup automatically when the data arrives
                         layer.setPopupContent(`
                             <div style="text-align:center; font-family:inherit; min-width: 160px;">
                                 <strong style="color:var(--primary-color); font-size:1.1rem;">📍 Location Pin</strong>
@@ -244,7 +240,6 @@ map.on(L.Draw.Event.CREATED, function (event) {
                         `);
                     })
                     .catch(error => {
-                        // Fallback just in case the elevation server is offline
                         layer.setPopupContent(`
                             <div style="text-align:center; font-family:inherit; min-width: 160px;">
                                 <strong style="color:var(--primary-color); font-size:1.1rem;">📍 Location Pin</strong>
@@ -254,10 +249,8 @@ map.on(L.Draw.Event.CREATED, function (event) {
                                 <strong>Elevation:</strong> <span style="color:red;">Unavailable</span>
                             </div>
                         `);
-                        console.warn("Could not retrieve elevation data.", error);
                     });
             } else {
-                // For other drawn items (polygons, lines), just add them normally
                 drawnItems.addLayer(layer);
             }
         });
@@ -276,6 +269,7 @@ map.on(L.Draw.Event.CREATED, function (event) {
     
     map.on('locationerror', function(e) { hideLoadingScreen(); showError("Could not acquire GPS location. Check permissions.", 'warning'); });
     
+    // --- Custom Reset View Button ---
     L.Control.ResetView = L.Control.extend({
         onAdd: map => {
             const c = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
@@ -286,40 +280,34 @@ map.on(L.Draw.Event.CREATED, function (event) {
         }
     });
     map.addControl(new L.Control.ResetView({ position: 'topleft' }));
-  
-// --- NEW: Custom Image GPS Location Button (With Close Button) ---
+
+    // --- Custom Image GPS Location Button ---
     L.Control.GPSButton = L.Control.extend({
         onAdd: map => {
-            // Create the main container
             const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control gps-image-btn');
             
-            // Create the main GPS image element
             const img = L.DomUtil.create('img', '', container);
             img.src = 'https://raw.githubusercontent.com/LIGTAS-AGAD/ligtas-agad-rilews-v-15-mobile-edition/refs/heads/main/ISLAW2.png'; 
             img.title = "Assess My Current Location";
             
-            // Create the tiny Close 'X' button
             const closeBtn = L.DomUtil.create('div', 'gps-close-btn', container);
             closeBtn.innerHTML = '×';
             closeBtn.title = "Hide GPS Button";
 
-            // LOGIC 1: Trigger GPS when the main icon is clicked
             img.onclick = (e) => {
                 L.DomEvent.stopPropagation(e);
                 showLoadingScreen("Acquiring GPS Signal..."); 
                 map.locate({setView: true, maxZoom: 16, timeout: 10000});
             };
 
-            // LOGIC 2: Remove the entire container when the 'X' is clicked
             closeBtn.onclick = (e) => {
-                L.DomEvent.stopPropagation(e); // Stops the click from bleeding through to the map
-                container.remove();            // Instantly deletes the button from the screen
+                L.DomEvent.stopPropagation(e); 
+                container.remove();            
             };
             
             return container;
         }
     });
-    // Add the button to the map (topright so we can middle-center it via CSS)
     map.addControl(new L.Control.GPSButton({ position: 'topright' }));
 
 } catch (e) { console.error("Map failed to initialize", e); showError("Map failed to load.", 'error'); }
@@ -409,7 +397,7 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
             <tr><th>Nearest Station</th><td>${nearestStation.StationName || nearestStation.Station}</td></tr>
             <tr><th>Distance</th><td>${nearestStation.distance} km</td></tr>
             <tr><th>Warning Level</th><td style="background-color:${color}; font-weight:bold;">Level ${wLevel}</td></tr>
-            <tr><th>Rainfall Accumulation(7-day)</th><td>${nearestStation.R24H || nearestStation.Rainfall || '0'} mm</td></tr>
+            <tr><th>Rainfall Antecedent+Cummulative (7-days)</th><td>${nearestStation.R24H || nearestStation.Rainfall || '0'} mm</td></tr>
             <tr><th>Latitude</th><td>${nearestStation.Latitude || 'N/A'}</td></tr>
             <tr><th>Longitude</th><td>${nearestStation.Longitude || 'N/A'}</td></tr>
             <tr><th>Elevation</th><td>${nearestStation.Elevation ? nearestStation.Elevation + ' m' : 'N/A'}</td></tr>
@@ -539,7 +527,7 @@ function syncAwsLayersWithData() {
             const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
             let warningLevel = parseInt(rawLevel); let targetColor = '#808080'; 
             if (warningLevel === 1) targetColor = 'yellow'; else if (warningLevel === 2) targetColor = 'orange'; else if (warningLevel === 3) targetColor = 'red'; else if (warningLevel === 0 || rawLevel === '0') targetColor = 'green'; 
-            layerData.layer.setStyle({ color: targetColor, weight: 0.9, opacity: 0.9, dashArray: '5, 10'});
+layerData.layer.setStyle({ color: targetColor, weight: 0.9, opacity: 0.9, dashArray: '5, 10'});
             layerData.layer.eachLayer(featureLayer => {
                 featureLayer.setPopupContent(`
                     <div class="popup-container">
@@ -547,7 +535,7 @@ function syncAwsLayersWithData() {
                         <table class="popup-table">
                             <tr><th>Linked Station</th><td>${station.StationName || station.Station}</td></tr>
                             <tr><th>Warning Level</th><td style="background-color:${targetColor}; font-weight:bold; color: ${warningLevel === 1 ? 'black' : 'white'};">Level ${warningLevel || rawLevel}</td></tr>
-                            <tr><th>Rainfall Accumulation (7-day)</th><td>${station.Rainfall || station.R24H || 0} mm</td></tr>
+                            <tr><th>Rainfall (24H)</th><td>${station.Rainfall || station.R24H || 0} mm</td></tr>
                             <tr><th>Status</th><td>${station.Status || 'N/A'}</td></tr>
                         </table>
                         <div class="popup-credits">Report Generated by <strong>DOST Project LIGTAS-AGAD RIILEWS</strong> (SESAM-UPLB)</div>
@@ -589,8 +577,9 @@ initSynchronizedAWSLayer(
     'Landgrant AWS'
 );
 
+
 // --- 6. Controls Initialization ---
-// Build the Modal Legend Content
+
 const legendContainer = document.getElementById('legendModalContent');
 if (legendContainer) {
     layerData.forEach((data, index) => {
@@ -687,7 +676,7 @@ function processAWSData(data) {
                             <tr><th>Latitude</th><td>${station.Latitude || 'N/A'}</td></tr>
                             <tr><th>Longitude</th><td>${station.Longitude || 'N/A'}</td></tr>
                             <tr><th>Elevation</th><td>${station.Elevation ? station.Elevation + ' m' : 'N/A'}</td></tr>
-                            <tr><th>Rainfall Accumulation Total (7-day)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
+                            <tr><th>Rainfall Antecedent+Cumulative (7-days)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
                             <tr><th>Warning Level</th><td>${station.RainfallLandslidethresholdwarninglevel || '0'}</td></tr>
                             <tr><th>Description</th><td>${station.Rainfalldescription || 'N/A'}</td></tr>
                             <tr><th>Scenario</th><td>${station.Possiblescenario || 'N/A'}</td></tr>
@@ -713,7 +702,7 @@ function processAWSData(data) {
 
 function fetchAndRefreshData() {
     fetch('')
-        .then(response => { if (!response.ok) throw new Error("Sheetlabs fetch failed"); return response.json(); })
+        .then(response => { if (!response.ok) throw new Error("Fetch failed"); return response.json(); })
         .then(data => { processAWSData(data); })
         .catch(error => { 
             if (typeof Papa !== 'undefined') {
@@ -861,28 +850,28 @@ function initSidebarControls() {
 
 const controlsModal = document.getElementById('controlsModal');
 const propertiesModal = document.getElementById('propertiesModal');
-const legendModal = document.getElementById('legendModal'); // NEW
+const legendModal = document.getElementById('legendModal');
 
 const openControlsBtn = document.getElementById('openControlsBtn');
 const openPropertiesBtn = document.getElementById('openPropertiesBtn');
-const openLegendBtn = document.getElementById('openLegendBtn'); // NEW
+const openLegendBtn = document.getElementById('openLegendBtn');
 
 const closeControlsBtn = document.getElementById('closeControlsBtn');
 const closePropertiesBtn = document.getElementById('closePropertiesBtn');
-const closeLegendBtn = document.getElementById('closeLegendBtn'); // NEW
+const closeLegendBtn = document.getElementById('closeLegendBtn');
 
 if(openControlsBtn) openControlsBtn.onclick = () => { controlsModal.style.display = "flex"; };
 if(openPropertiesBtn) openPropertiesBtn.onclick = () => { propertiesModal.style.display = "flex"; };
-if(openLegendBtn) openLegendBtn.onclick = () => { legendModal.style.display = "flex"; }; // NEW
+if(openLegendBtn) openLegendBtn.onclick = () => { legendModal.style.display = "flex"; };
 
 if(closeControlsBtn) closeControlsBtn.onclick = () => { controlsModal.style.display = "none"; };
 if(closePropertiesBtn) closePropertiesBtn.onclick = () => { propertiesModal.style.display = "none"; };
-if(closeLegendBtn) closeLegendBtn.onclick = () => { legendModal.style.display = "none"; }; // NEW
+if(closeLegendBtn) closeLegendBtn.onclick = () => { legendModal.style.display = "none"; };
 
 window.addEventListener('click', (e) => {
     if (e.target === controlsModal) controlsModal.style.display = "none";
     if (e.target === propertiesModal) propertiesModal.style.display = "none";
-    if (e.target === legendModal) legendModal.style.display = "none"; // NEW
+    if (e.target === legendModal) legendModal.style.display = "none";
 });
 
 const toggleBufferBtn = document.getElementById('toggle-buffer');
@@ -969,3 +958,193 @@ if (hamburgerBtn && subheaderMenu) {
 
     if (typeof map !== 'undefined') { map.on('click dragstart zoomstart', function() { subheaderMenu.classList.remove('show-menu'); }); }
 }
+
+// ==========================================
+// 11. ALL STATIONS RAINFALL GRAPH (CHART.JS)
+// ==========================================
+
+let rainfallChartInstance = null;
+const allStationsGraphModal = document.getElementById('allStationsGraphModal');
+const closeAllStationsGraphBtn = document.getElementById('closeAllStationsGraphBtn');
+const openAllStationsGraphBtn = document.getElementById('openAllStationsGraphBtn');
+const downloadGraphBtn = document.getElementById('downloadGraphBtn');
+
+if (openAllStationsGraphBtn) {
+    openAllStationsGraphBtn.onclick = () => {
+        allStationsGraphModal.style.display = "flex";
+        renderAllStationsGraph();
+    };
+}
+
+if (closeAllStationsGraphBtn) {
+    closeAllStationsGraphBtn.onclick = () => { allStationsGraphModal.style.display = "none"; };
+}
+
+window.addEventListener('click', (e) => {
+    if (e.target === allStationsGraphModal) allStationsGraphModal.style.display = "none";
+});
+
+if (downloadGraphBtn) {
+    downloadGraphBtn.onclick = () => {
+        const canvas = document.getElementById('allStationsChart');
+        if (canvas) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const ctx = tempCanvas.getContext('2d');
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            ctx.drawImage(canvas, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = 'LIGTAS-Rainfall-Graph.png';
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+        }
+    };
+}
+
+function renderAllStationsGraph() {
+    const ctx = document.getElementById('allStationsChart').getContext('2d');
+    const countSpan = document.getElementById('awsTotalCount');
+
+    // Detect Current Theme for Chart Colors
+    const isDark = document.body.classList.contains('dark-mode');
+    const textColor = isDark ? '#e0e0e0' : '#666';
+    const gridColor = isDark ? '#444' : 'rgba(0,0,0,0.1)';
+
+    const labels = [];
+    const dataValues = [];
+    const backgroundColors = [];
+
+    if (cachedAWSData && cachedAWSData.length > 0) {
+        if (countSpan) countSpan.innerText = cachedAWSData.length;
+
+        const sortedData = [...cachedAWSData].sort((a, b) => {
+            const rainA = parseFloat(a.Rainfall || a.R24H || 0);
+            const rainB = parseFloat(b.Rainfall || b.R24H || 0);
+            return rainB - rainA;
+        });
+
+        sortedData.forEach(station => {
+            const name = station.StationName || station.Station || 'Unknown';
+            const rain = parseFloat(station.Rainfall || station.R24H || 0);
+            const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
+            
+            let color = 'rgba(46, 204, 113, 0.85)'; 
+            if (level === 1) color = 'rgba(255, 215, 0, 0.9)'; 
+            if (level === 2) color = 'rgba(255, 140, 0, 0.9)'; 
+            if (level === 3) color = 'rgba(231, 76, 60, 0.9)'; 
+            
+            labels.push(name);
+            dataValues.push(rain);
+            backgroundColors.push(color);
+        });
+    } else {
+        if (countSpan) countSpan.innerText = "0";
+        labels.push('No Data Available');
+        dataValues.push(0);
+        backgroundColors.push(isDark ? 'rgba(100, 100, 100, 0.7)' : 'rgba(200, 200, 200, 0.7)');
+    }
+
+    const chartContainer = document.getElementById('chartAreaContainer');
+    if (chartContainer) {
+        const requiredWidth = labels.length * 40;
+        chartContainer.style.width = requiredWidth > 600 ? requiredWidth + 'px' : '100%';
+    }
+
+    if (rainfallChartInstance) {
+        rainfallChartInstance.destroy();
+    }
+
+    rainfallChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Total Rainfall (mm)',
+                data: dataValues,
+                backgroundColor: backgroundColors,
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.4)',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Rainfall (mm)', font: { weight: 'bold' }, color: textColor },
+                    ticks: { color: textColor },
+                    grid: { color: gridColor }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: false,
+                        color: textColor
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: function(context) { return ` ${context.raw} mm`; } } }
+            }
+        }
+    });
+}
+
+// ==========================================
+// 12. AUTOMATIC & MANUAL DARK MODE LOGIC
+// ==========================================
+
+const toggleDarkModeBtn = document.getElementById('toggleDarkModeBtn');
+
+function enableDarkMode(isDark) {
+    if (isDark) {
+        document.body.classList.add('dark-mode');
+        if (toggleDarkModeBtn) {
+            toggleDarkModeBtn.innerText = '☀️ Light Mode';
+            toggleDarkModeBtn.classList.add('btn-warning');
+        }
+    } else {
+        document.body.classList.remove('dark-mode');
+        if (toggleDarkModeBtn) {
+            toggleDarkModeBtn.innerText = '🌙 Dark Mode';
+            toggleDarkModeBtn.classList.remove('btn-warning');
+        }
+    }
+}
+
+function checkAutoDarkMode() {
+    const savedPref = localStorage.getItem('ligtas-dark-mode');
+    if (savedPref !== null) {
+        enableDarkMode(savedPref === 'true');
+        return;
+    }
+
+    const currentHour = new Date().getHours();
+    const isNight = currentHour >= 18 || currentHour < 6;
+    enableDarkMode(isNight);
+}
+
+if (toggleDarkModeBtn) {
+    toggleDarkModeBtn.addEventListener('click', () => {
+        const isCurrentlyDark = document.body.classList.contains('dark-mode');
+        enableDarkMode(!isCurrentlyDark);
+        
+        localStorage.setItem('ligtas-dark-mode', !isCurrentlyDark);
+
+        const allStationsGraphModal = document.getElementById('allStationsGraphModal');
+        if (allStationsGraphModal && allStationsGraphModal.style.display === "flex") {
+            renderAllStationsGraph();
+        }
+    });
+}
+
+checkAutoDarkMode();
