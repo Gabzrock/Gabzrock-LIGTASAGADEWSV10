@@ -184,7 +184,7 @@ try {
         "Hybrid": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' }),
         "Topo": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' })
     };
-    baseLayersData["Hybrid"].addTo(map);
+    baseLayersData["Streets"].addTo(map);
 
     L.control.scale().addTo(map); L.control.locate().addTo(map);
     
