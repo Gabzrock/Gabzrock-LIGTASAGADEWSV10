@@ -117,7 +117,7 @@ function updateClock() {
 }
 setInterval(updateClock, 1000); updateClock(); 
 
-function Homebutton() { window.location.href = 'https://ligtas.uplb.edu.ph/LIGTAS-AGAD_new_portal-main/';  }
+function Homebutton() { window.location.href = 'https://gabzrock.github.io/Gabzrock-LIGTASAGADEWSV10/';  }
 function AWSbutton() { window.location.href = 'https://gabzrock.github.io/LIGTAS-AGADLandslide-Warning-Advisories/'; }
 
 function formatPropertyName(key) {
