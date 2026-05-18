@@ -184,7 +184,7 @@ try {
         "Hybrid": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' }),
         "Topo": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' })
     };
-    baseLayersData["Streets"].addTo(map);
+    baseLayersData["Hybrid"].addTo(map);
 
     L.control.scale().addTo(map); L.control.locate().addTo(map);
     
@@ -1068,12 +1068,55 @@ function renderAllStationsGraph() {
                 backgroundColor: backgroundColors,
                 borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.4)',
                 borderWidth: 1,
-                borderRadius: 4
+                borderRadius: 4,
+                hoverBackgroundColor: 'rgba(52, 152, 219, 1)', // Turns blue on hover to indicate it's clickable
+                cursor: 'pointer'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            // ✨ NEW: Click-to-Zoom Functionality
+            onClick: (event, activeElements) => {
+                if (activeElements.length > 0) {
+                    const dataIndex = activeElements[0].index;
+                    const clickedStationName = labels[dataIndex];
+
+                    // Find the station in our cached data
+                    const station = cachedAWSData.find(s => (s.StationName || s.Station || 'Unknown') === clickedStationName);
+
+                    if (station && station.Latitude && station.Longitude) {
+                        const lat = parseFloat(station.Latitude);
+                        const lng = parseFloat(station.Longitude);
+
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            // 1. Close the modal to reveal the map
+                            document.getElementById('allStationsGraphModal').style.display = "none";
+
+                            // 2. Smoothly fly to the station's location
+                            map.flyTo([lat, lng], 14, { duration: 1.5 });
+
+                            // 3. Find the specific marker on the map and open its popup
+                            warningLayerGroup.eachLayer(layer => {
+                                if (layer instanceof L.Marker) {
+                                    const popup = layer.getPopup();
+                                    if (popup && popup.getContent().includes(clickedStationName)) {
+                                        // Slight delay ensures the map panning finishes before popping up
+                                        setTimeout(() => {
+                                            layer.openPopup();
+                                            updatePropertiesTable("AWS Station", station);
+                                        }, 500); 
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            },
+            // Makes the mouse cursor a pointer when hovering over bars
+            onHover: (event, chartElement) => {
+                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+            },
             scales: {
                 y: {
                     beginAtZero: true,
