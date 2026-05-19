@@ -539,14 +539,20 @@ body.dark-mode .chart-scroll-wrapper { border: 1px solid #444; }
 
     #subheader:not(.show-menu), .header-controls:not(.show-menu) { display: none !important; height: 0 !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; overflow: hidden !important; }
     
-    .map-panel-container {
+.map-panel-container {
         overflow: hidden; 
-        padding: 5px; 
+        padding: 10px; 
         background-color: #f4f4f4;
-        height: calc(100vh - 90px); 
-        height: calc(100dvh - 90px); 
+        
+        /* 👇 CHANGED: Reduces the map to exactly 60% of the mobile screen height */
+        height: 60vh; 
+        height: 60dvh; 
+        
         display: flex;
         flex-direction: column;
+        
+        /* 👇 Optional: Adds some space below the map so the ticker doesn't touch it immediately */
+        margin-bottom: 15px; 
     }
 
     #map {
