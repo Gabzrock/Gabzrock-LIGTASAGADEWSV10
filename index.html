@@ -28,8 +28,8 @@
             <div class="splash-logos">
                 <img src="https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png" alt="LIGTAS Logo">
             </div>
-            <h1>LIGTAS-AGAD</h1>
-            <p>Rainfall-induced Landslide Early Warning System (RILEWS)</p>
+            <h1>LIGTAS-AGAD RIILEWS</h1>
+            <p>Landslide Warning and Advisory Map</p>
             <div class="splash-spinner"></div>
             <h3 id="splash-message">Initializing System & Loading Map Data...</h3>
         </div>
@@ -46,45 +46,53 @@
         <button class="hamburger-btn" id="hamburgerBtn">☰</button>
     </div>
 
-    <div id="subheader" class="header-controls">
-        <span id="real-time-mobile" class="mobile-clock"></span>
+<div id="subheader-wrapper">
+        <button class="scroll-arrow left-arrow" id="scrollLeftBtn">&#10094;</button>
         
-        <div class="button-group-container">
-            <span class="group-label">SYSTEM</span>
-            <div class="button-pod">
-                <button class="nav-btn" onclick="Homebutton()">🏠 Home</button>
-                <button class="nav-btn" onclick="window.open('https://script.google.com/a/macros/up.edu.ph/s/AKfycbz5_G7ghXnc_k1vPKDVZA4VTCvf57YpK4PxULBT0GJM6Jhd_EBxObg4a2-EZkNSct8/exec', '_blank')">🔍 Detect Landslides</button>
-                <button class="nav-btn" onclick="window.open('YOUR_ABOUT_URL_HERE', '_blank')">ℹ️ About</button>
+        <div id="subheader" class="header-controls">
+            <span id="real-time-mobile" class="mobile-clock"></span>
+            
+            <div class="button-group-container">
+                <span class="group-label">SYSTEM</span>
+                <div class="button-pod">
+                    <button class="nav-btn" onclick="Homebutton()">🏠 Home</button>
+                    <button class="nav-btn" onclick="window.open('YOUR_DETECT_URL_HERE', '_blank')">🔍 Detect Landslides</button>
+                    <button class="nav-btn" onclick="window.open('YOUR_ABOUT_URL_HERE', '_blank')">ℹ️ About</button>
+                </div>
             </div>
-        </div>
 
-        <div class="button-group-container">
-            <span class="group-label">TOOLS</span>
-            <div class="button-pod">
-                <button class="nav-btn btn-warning" id="assessLocationBtn">📍 Assess Location</button>
-                <button class="nav-btn" id="toggleEffectsBtn">✨ Effects</button>
+            <div class="button-group-container">
+                <span class="group-label">TOOLS</span>
+                <div class="button-pod">
+                    <button class="nav-btn btn-warning" id="assessLocationBtn">📍 Assess Location</button>
+                    <button class="nav-btn" id="toggleEffectsBtn">✨ Effects</button>
+                </div>
             </div>
-        </div>
 
-        <div class="button-group-container">
-            <span class="group-label">DATA</span>
-            <div class="button-pod">
-                <button class="nav-btn btn-danger" id="toggle-buffer">⭕ AWS Warning</button>
-                <button class="nav-btn" onclick="AWSbutton()">📊 Landslide Advisories</button>
-                <button class="nav-btn btn-success" id="openAllStationsGraphBtn">📈 AWS Data</button>
+            <div class="button-group-container">
+                <span class="group-label">DATA</span>
+                <div class="button-pod">
+                    <button class="nav-btn btn-danger" id="toggle-buffer">⭕ AWS warning</button>
+                    <button class="nav-btn" onclick="AWSbutton()">📊 Landslide advisories</button>
+                    <button class="nav-btn btn-success" id="openAllStationsGraphBtn">📈 All Stations</button>
+                </div>
             </div>
-        </div>
 
-        <div class="button-group-container">
-            <span class="group-label">VIEWS</span>
-            <div class="button-pod">
-                <button class="nav-btn" id="toggleDarkModeBtn">🌙 Dark Mode</button>
-                <button class="nav-btn" id="openLegendBtn">🗺️ Legend</button>
-                <button class="nav-btn" id="openControlsBtn">⚙️ Layer Controls</button>
-                <button class="nav-btn" id="openPropertiesBtn">📋 Feature Properties</button>
+            <div class="button-group-container">
+                <span class="group-label">VIEWS</span>
+                <div class="button-pod">
+                    <button class="nav-btn" id="toggleDarkModeBtn">🌙 Dark Mode</button>
+                    <button class="nav-btn" id="openLegendBtn">🗺️ Map Legend</button>
+                    <button class="nav-btn" id="openControlsBtn">⚙️ Layer controls</button>
+                    <button class="nav-btn" id="openPropertiesBtn">📋 Feature Properties</button>
+                </div>
             </div>
         </div>
+        
+        <button class="scroll-arrow right-arrow" id="scrollRightBtn">&#10095;</button>
     </div>
+  
+  
 
     <div class="map-panel-container">
         <div id="map"></div>
@@ -104,7 +112,7 @@
             <span class="close-ui-modal" id="closeControlsBtn">&times;</span>
             <h3>⚙️ Layer Controls</h3>
             <div class="panel-content">
-                <h4>Global Layers</h4>
+                <h4>All Layers</h4>
                 <div class="layer-actions">
                     <button id="loadAllLayersBtn">Load All</button>
                     <button id="unloadAllLayersBtn">Unload All</button>
