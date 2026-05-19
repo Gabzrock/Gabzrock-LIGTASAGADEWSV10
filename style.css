@@ -384,8 +384,7 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
     #real-time, .desktop-clock { display: none !important; }
     .hamburger-btn { display: block !important; }
     .mobile-clock { display: block !important; text-align: center; color: #FFD700; font-size: 1.05rem; font-weight: bold; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.3); margin-bottom: 10px; }
-    
-    .scroll-arrow { display: none !important; }
+    .scroll-arrow { display: block !important; }
     #subheader-wrapper { background: none; box-shadow: none; position: static; }
 
     /* HAMBURGER MENU OVERRIDES WITH SCROLLBAR FIX */
