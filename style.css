@@ -470,8 +470,8 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     .ui-modal-content { width: 95%; max-width: none; }
-    .splash-content h1 { font-size: 1.5rem; }
-    .splash-logos img { height: 80px; }
+    .splash-content h1 { font-size: 1.0rem; }
+    .splash-logos img { height: 70px; }
 }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
