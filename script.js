@@ -117,7 +117,7 @@ function updateClock() {
 }
 setInterval(updateClock, 1000); updateClock(); 
 
-function Homebutton() { window.location.href = 'https://gabzrock.github.io/Gabzrock-LIGTASAGADEWSV10/';  }
+function Homebutton() { window.location.href = 'https://ligtas.uplb.edu.ph/LIGTAS-AGAD_new_portal-main/';  }
 function AWSbutton() { window.location.href = 'https://gabzrock.github.io/LIGTAS-AGADLandslide-Warning-Advisories/'; }
 
 function formatPropertyName(key) {
@@ -1191,3 +1191,56 @@ if (toggleDarkModeBtn) {
 }
 
 checkAutoDarkMode();
+
+// ==========================================
+// 13. SUBHEADER SCROLL ARROWS LOGIC
+// ==========================================
+
+const subheaderMenuScroll = document.getElementById('subheader');
+const scrollLeftBtn = document.getElementById('scrollLeftBtn');
+const scrollRightBtn = document.getElementById('scrollRightBtn');
+
+function updateScrollArrows() {
+    if (!subheaderMenuScroll || !scrollLeftBtn || !scrollRightBtn) return;
+    
+    // Only apply arrow logic on desktop (hamburger menu handles mobile)
+    if (window.innerWidth <= 768) {
+        scrollLeftBtn.style.display = 'none';
+        scrollRightBtn.style.display = 'none';
+        return;
+    }
+
+    // Check if the container's contents are wider than the screen
+    const maxScrollLeft = subheaderMenuScroll.scrollWidth - subheaderMenuScroll.clientWidth;
+    
+    if (maxScrollLeft > 0) {
+        // Show left arrow if we have scrolled right at all
+        scrollLeftBtn.style.display = subheaderMenuScroll.scrollLeft > 5 ? 'block' : 'none';
+        // Show right arrow if we haven't reached the end
+        scrollRightBtn.style.display = subheaderMenuScroll.scrollLeft < (maxScrollLeft - 5) ? 'block' : 'none';
+    } else {
+        // No overflow, hide both
+        scrollLeftBtn.style.display = 'none';
+        scrollRightBtn.style.display = 'none';
+    }
+}
+
+if (subheaderMenuScroll) {
+    // Listen for scroll events and window resizing to recalculate arrows
+    subheaderMenuScroll.addEventListener('scroll', updateScrollArrows);
+    window.addEventListener('resize', updateScrollArrows);
+    // Initial check
+    setTimeout(updateScrollArrows, 300);
+}
+
+// Button Click Actions (Scroll by 200px)
+if (scrollLeftBtn) {
+    scrollLeftBtn.addEventListener('click', () => {
+        subheaderMenuScroll.scrollBy({ left: -200, behavior: 'smooth' });
+    });
+}
+if (scrollRightBtn) {
+    scrollRightBtn.addEventListener('click', () => {
+        subheaderMenuScroll.scrollBy({ left: 200, behavior: 'smooth' });
+    });
+}
