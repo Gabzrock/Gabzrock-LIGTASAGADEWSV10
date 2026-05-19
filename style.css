@@ -413,7 +413,7 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
     line-height: 40px;
     font-weight: 600;
     font-size: 1.0rem;
-    animation: ticker-scroll 90s linear infinite; /* Adjusted to 60s for slower scroll */
+    animation: ticker-scroll 120s linear infinite; /* Adjusted to 60s for slower scroll */
 }
 
 /* Pause animation on hover */
