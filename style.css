@@ -462,7 +462,7 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
 
     #map {
         min-height: 0 !important; 
-        height: 90%;
+        height: 80%;
         flex-grow: 1; 
         
         border-radius: 12px;
