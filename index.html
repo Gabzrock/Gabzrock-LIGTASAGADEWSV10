@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIGTAS-AGAD RILEWS | Rainfall-Induced Landslide Early Warning System
-</title>
+    <title>LIGTAS-RILEWSV3 | Landslide Warning Map</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.79.0/dist/L.Control.Locate.min.css" />
@@ -40,13 +39,13 @@
     <div id="header2">
         <div class="header-left">
             <img src="https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png" alt="LIGTAS Logo" class="header-logo">
-            <div class="header-title">LIGTAS-AGAD | Rainfall-Induced Landslide Early Warning System(RILEWS)</div>
+            <div class="header-title">LIGTAS-RILEWSV3 | Landslide Warning Map</div>
         </div>
         <span id="real-time" class="desktop-clock"></span>
         <button class="hamburger-btn" id="hamburgerBtn">☰</button>
     </div>
 
-<div id="subheader-wrapper">
+    <div id="subheader-wrapper">
         <button class="scroll-arrow left-arrow" id="scrollLeftBtn">&#10094;</button>
         
         <div id="subheader" class="header-controls">
@@ -55,26 +54,27 @@
             <div class="button-group-container">
                 <span class="group-label">SYSTEM</span>
                 <div class="button-pod">
-                    <button class="nav-btn" onclick="Homebutton()">🏠 Home</button>
-                    <button class="nav-btn" onclick="window.open('https://script.google.com/macros/s/AKfycbz5_G7ghXnc_k1vPKDVZA4VTCvf57YpK4PxULBT0GJM6Jhd_EBxObg4a2-EZkNSct8/exec', '_blank')">🔍 Detect Landslides</button>
-                    <button class="nav-btn" onclick="window.open('YOUR_ABOUT_URL_HERE', '_blank')">ℹ️ About</button>
+                    <button class="nav-btn" onclick="Homebutton()">Home</button>
+                    <button class="nav-btn" id="toggleEffectsBtn">Visual Effects</button>
+                    <button class="nav-btn" onclick="window.open('NotAvailable', '_blank')"> About</button>
                 </div>
             </div>
 
             <div class="button-group-container">
                 <span class="group-label">TOOLS</span>
                 <div class="button-pod">
-                    <button class="nav-btn btn-warning" id="assessLocationBtn">📍 Assess Location</button>
-                    <button class="nav-btn" id="toggleEffectsBtn">✨ Effects</button>
+                    <button class="nav-btn btn-warning" id="assessLocationBtn">Assess Location</button>
+                     <button class="nav-btn" onclick="window.open('https://script.google.com/macros/s/AKfycbz5_G7ghXnc_k1vPKDVZA4VTCvf57YpK4PxULBT0GJM6Jhd_EBxObg4a2-EZkNSct8/exec', '_blank')">Detect Landslides</button>
                 </div>
             </div>
 
             <div class="button-group-container">
                 <span class="group-label">DATA</span>
                 <div class="button-pod">
-                    <button class="nav-btn btn-danger" id="toggle-buffer">⭕ AWS warning</button>
-                    <button class="nav-btn" onclick="AWSbutton()">📊 Landslide advisories</button>
-                    <button class="nav-btn btn-success" id="openAllStationsGraphBtn">📈 All Stations</button>
+                    <button class="nav-btn btn-danger" id="toggle-buffer">AWS Warning</button>
+                    <button class="nav-btn btn-success" id="openAllStationsGraphBtn">All Stations</button>
+                    <button class="nav-btn" onclick="AWSbutton()">Landslide Advisories</button>
+                     <button class="nav-btn" onclick="window.open('https://www.pagasa.dost.gov.ph/weather/weather-advisory', '_blank')">PAGASA Advisories</button>
                 </div>
             </div>
 
@@ -82,8 +82,8 @@
                 <span class="group-label">VIEWS</span>
                 <div class="button-pod">
                     <button class="nav-btn" id="toggleDarkModeBtn">🌙 Dark Mode</button>
-                    <button class="nav-btn" id="openLegendBtn">🗺️ Map Legend</button>
-                    <button class="nav-btn" id="openControlsBtn">⚙️ Layer controls</button>
+                    <button class="nav-btn" id="openLegendBtn">🗺️ Legend</button>
+                    <button class="nav-btn" id="openControlsBtn">⚙️ Layer Controls</button>
                     <button class="nav-btn" id="openPropertiesBtn">📋 Feature Properties</button>
                 </div>
             </div>
@@ -91,11 +91,18 @@
         
         <button class="scroll-arrow right-arrow" id="scrollRightBtn">&#10095;</button>
     </div>
-  
-  
 
     <div class="map-panel-container">
         <div id="map"></div>
+    </div>
+
+    <div id="alert-ticker">
+        <div class="ticker-label">STATUS</div>
+        <div class="ticker-content-wrapper">
+            <div id="ticker-text" class="ticker-text">
+                Fetching latest AWS station data...
+            </div>
+        </div>
     </div>
 
     <div id="legendModal" class="ui-modal">
@@ -110,9 +117,9 @@
     <div id="controlsModal" class="ui-modal">
         <div class="ui-modal-content">
             <span class="close-ui-modal" id="closeControlsBtn">&times;</span>
-            <h3>⚙️ Layer Controls</h3>
+            <h3>⚙️ Map Controls & Forecast</h3>
             <div class="panel-content">
-                <h4>All Layers</h4>
+                <h4>Global Layers</h4>
                 <div class="layer-actions">
                     <button id="loadAllLayersBtn">Load All</button>
                     <button id="unloadAllLayersBtn">Unload All</button>
@@ -165,7 +172,7 @@
             <span class="close-ui-modal" id="closeAllStationsGraphBtn">&times;</span>
             <h3>📊 Data from all stations</h3>
             <p style="text-align: center; font-size: 0.95rem; color: #666; margin-bottom: 10px;">
-                Antecedent+Cumulative Rainfall Total(mm) | <strong><span id="awsTotalCount">0</span> Stations Online</strong>
+                Current Total Rainfall (mm) | <strong><span id="awsTotalCount">0</span> Stations Online</strong>
             </p>
             
             <div class="panel-content chart-scroll-wrapper" style="width: 100%; overflow-x: auto; overflow-y: hidden; border: 1px solid #eee; border-radius: 4px; padding: 10px 0;">
