@@ -447,21 +447,27 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
 
     #subheader:not(.show-menu), .header-controls:not(.show-menu) { display: none !important; height: 0 !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; overflow: hidden !important; }
     
-    .map-panel-container {
-        overflow-y: auto; 
-        overflow-x: hidden;
-        padding: 10px;
+  .map-panel-container {
+        overflow: hidden; /* Prevents double scrollbars on mobile */
+        padding: 5px; /* Slightly tighter padding to maximize map space */
         background-color: #f4f4f4;
-        /* Subtract Header (50px) and Ticker (40px) */
-        height: calc(100vh - 90px); 
+        
+        /* Use 'dvh' to account for mobile address bars shrinking/growing */
+        height: calc(100vh - 90px); /* Fallback for older browsers */
+        height: calc(100dvh - 90px); /* Subtract Header (50px) + Ticker (40px) */
+        
+        display: flex;
+        flex-direction: column;
     }
 
     #map {
-        min-height: 600px; 
+        min-height: 0 !important; 
+        height: 100%;
+        flex-grow: 1; 
+        
         border-radius: 12px;
         border: 1px solid #ddd;
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        flex-grow: 0; 
     }
     .ui-modal-content { width: 95%; max-width: none; }
     .splash-content h1 { font-size: 1.5rem; }
