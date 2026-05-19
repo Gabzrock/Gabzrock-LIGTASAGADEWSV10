@@ -52,21 +52,47 @@ body {
     margin-left: auto; padding-right: 10px; letter-spacing: 0.5px; white-space: nowrap; 
 }
 
-#subheader {
-    flex-shrink: 0; 
+#subheader-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
     background-color: #2a4c54; 
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2); 
+    z-index: 1999;
+}
+
+#subheader {
+    flex-grow: 1; 
     padding: 10px 20px;
     display: flex; 
     align-items: flex-end; 
     gap: 20px; 
-    box-shadow: 0 3px 8px rgba(0,0,0,0.2); 
-    z-index: 1999;
     overflow-x: auto;
     white-space: nowrap;
+    scroll-behavior: smooth; /* Makes the arrow clicks glide smoothly */
 }
 
 #subheader::-webkit-scrollbar { display: none; }
 #subheader { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Subheader Scroll Arrows */
+.scroll-arrow {
+    background: rgba(26, 59, 66, 0.95);
+    color: #FFD700;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: bold;
+    z-index: 10;
+    display: none; /* Hidden by default via JS */
+    position: absolute;
+    height: 100%;
+    padding: 0 12px;
+    transition: background 0.2s, color 0.2s;
+}
+.scroll-arrow:hover { background: var(--primary-color); color: white; }
+.left-arrow { left: 0; box-shadow: 2px 0 5px rgba(0,0,0,0.2); }
+.right-arrow { right: 0; box-shadow: -2px 0 5px rgba(0,0,0,0.2); }
 
 .button-group-container {
     display: flex;
