@@ -377,7 +377,7 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
 .mobile-clock { display: none !important; }
 .hamburger-btn { display: none !important; background: none; border: none; color: white; font-size: 1.8rem; cursor: pointer; padding: 0 5px; transition: transform 0.2s; }
 
-@media (max-width: 750px) {
+@media (max-width: 768px) {
     #header2 { padding: 0 15px; }
     .header-left { flex-grow: 1; overflow: hidden; } 
     .header-title { font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -579,4 +579,54 @@ body.dark-mode .chart-scroll-wrapper { border: 1px solid #444; }
 @keyframes ticker-scroll {
     0% { transform: translateX(100vw); }
     100% { transform: translateX(-100%); }
+}
+/* =========================================
+   15. VISIBLE MOBILE SCROLLBARS
+   ========================================= */
+@media (max-width: 768px) {
+    /* 1. Ensure the map container is allowed to scroll vertically if needed */
+    .map-panel-container {
+        overflow-y: auto !important; 
+    }
+
+    /* 2. Force scrollbars to display across all scrollable containers */
+    .map-panel-container::-webkit-scrollbar,
+    .panel-content::-webkit-scrollbar,
+    #subheader::-webkit-scrollbar,
+    .chart-scroll-wrapper::-webkit-scrollbar {
+        display: block !important;
+        width: 6px;  /* Vertical scrollbar width */
+        height: 8px; /* Horizontal scrollbar height */
+        -webkit-appearance: none;
+    }
+
+    /* 3. Style the track (background of the scrollbar) */
+    .map-panel-container::-webkit-scrollbar-track,
+    .panel-content::-webkit-scrollbar-track,
+    #subheader::-webkit-scrollbar-track,
+    .chart-scroll-wrapper::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 10px;
+    }
+
+    /* 4. Style the thumb (the part you grab and drag) */
+    .map-panel-container::-webkit-scrollbar-thumb,
+    .panel-content::-webkit-scrollbar-thumb,
+    #subheader::-webkit-scrollbar-thumb,
+    .chart-scroll-wrapper::-webkit-scrollbar-thumb {
+        background-color: var(--primary-color);
+        border-radius: 10px;
+    }
+
+    /* Dark Mode overrides for the mobile scrollbar */
+    body.dark-mode .map-panel-container::-webkit-scrollbar-track,
+    body.dark-mode .panel-content::-webkit-scrollbar-track,
+    body.dark-mode #subheader::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    body.dark-mode .map-panel-container::-webkit-scrollbar-thumb,
+    body.dark-mode .panel-content::-webkit-scrollbar-thumb,
+    body.dark-mode #subheader::-webkit-scrollbar-thumb {
+        background-color: var(--light-teal);
+    }
 }
