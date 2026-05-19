@@ -59,6 +59,7 @@ body {
     background-color: #2a4c54; 
     box-shadow: 0 3px 8px rgba(0,0,0,0.2); 
     z-index: 1999;
+    flex-shrink: 0;
 }
 
 #subheader {
@@ -69,7 +70,7 @@ body {
     gap: 20px; 
     overflow-x: auto;
     white-space: nowrap;
-    scroll-behavior: smooth; /* Makes the arrow clicks glide smoothly */
+    scroll-behavior: smooth;
 }
 
 #subheader::-webkit-scrollbar { display: none; }
@@ -84,7 +85,7 @@ body {
     font-size: 20px;
     font-weight: bold;
     z-index: 10;
-    display: none; /* Hidden by default via JS */
+    display: none; 
     position: absolute;
     height: 100%;
     padding: 0 12px;
@@ -334,7 +335,7 @@ body {
 /* 🔴 OPTIMIZED HARDWARE-ACCELERATED EFFECTS */
 @keyframes pulse-expand {
     0% { transform: scale(0.5); opacity: 1.5; }
-    100% { transform: scale(1.1); opacity: 0; }
+    100% { transform: scale(1.0); opacity: 0; }
 }
 .pulse-layer { 
     transform-box: fill-box; 
@@ -383,6 +384,9 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
     #real-time, .desktop-clock { display: none !important; }
     .hamburger-btn { display: block !important; }
     .mobile-clock { display: block !important; text-align: center; color: #FFD700; font-size: 1.05rem; font-weight: bold; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.3); margin-bottom: 10px; }
+    
+    .scroll-arrow { display: none !important; }
+    #subheader-wrapper { background: none; box-shadow: none; position: static; }
 
     /* HAMBURGER MENU OVERRIDES WITH SCROLLBAR FIX */
     #subheader {
@@ -448,7 +452,8 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
         overflow-x: hidden;
         padding: 10px;
         background-color: #f4f4f4;
-        height: calc(100vh - 50px); 
+        /* Subtract Header (50px) and Ticker (40px) */
+        height: calc(100vh - 90px); 
     }
 
     #map {
@@ -511,3 +516,62 @@ body.dark-mode .popup-credits { background: #121212; border-top: 1px solid #333;
 body.dark-mode .leaflet-control { background: rgba(30, 30, 30, 0.85) !important; color: #e0e0e0 !important; border: 1px solid #444 !important; }
 body.dark-mode .leaflet-control-custom:hover { background-color: #333 !important; }
 body.dark-mode .chart-scroll-wrapper { border: 1px solid #444; }
+
+/* =========================================
+   14. SCROLLING ALERT TICKER
+   ========================================= */
+#alert-ticker {
+    flex-shrink: 0;
+    height: 40px;
+    background-color: #27ae60; 
+    color: white;
+    display: flex;
+    align-items: center;
+    z-index: 4000;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+    transition: background-color 0.5s;
+}
+
+.ticker-label {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    font-weight: bold;
+    padding: 0 15px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    z-index: 2;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.ticker-content-wrapper {
+    flex-grow: 1;
+    overflow: hidden;
+    position: relative;
+    height: 100%;
+}
+
+.ticker-text {
+    position: absolute;
+    white-space: nowrap;
+    line-height: 40px;
+    font-weight: 600;
+    font-size: 1.05rem;
+    animation: ticker-scroll 90s linear infinite;
+}
+
+/* Pause animation on hover */
+.ticker-content-wrapper:hover .ticker-text {
+    animation-play-state: paused;
+}
+
+.ticker-text span.level-1 { color: #FFD700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); } 
+.ticker-text span.level-2 { color: #FFA500; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); } 
+.ticker-text span.level-3 { color: #ffcccc; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); } 
+
+@keyframes ticker-scroll {
+    0% { transform: translateX(100vw); }
+    100% { transform: translateX(-100%); }
+}
