@@ -117,7 +117,7 @@ function updateClock() {
 }
 setInterval(updateClock, 1000); updateClock(); 
 
-function Homebutton() { window.location.href = 'https://gabzrock.github.io/Gabzrock-LIGTASAGADEWSV10/';  }
+function Homebutton() { window.location.href = 'https://ligtas.uplb.edu.ph/LIGTAS-AGAD_new_portal-main/';  }
 function AWSbutton() { window.location.href = 'https://gabzrock.github.io/LIGTAS-AGADLandslide-Warning-Advisories/'; }
 
 function formatPropertyName(key) {
@@ -397,7 +397,7 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
             <tr><th>Nearest Station</th><td>${nearestStation.StationName || nearestStation.Station}</td></tr>
             <tr><th>Distance</th><td>${nearestStation.distance} km</td></tr>
             <tr><th>Warning Level</th><td style="background-color:${color}; font-weight:bold;">Level ${wLevel}</td></tr>
-            <tr><th>Rainfall Antecedent+Cummulative (7-days)</th><td>${nearestStation.R24H || nearestStation.Rainfall || '0'} mm</td></tr>
+            <tr><th>Rainfall (24h)</th><td>${nearestStation.R24H || nearestStation.Rainfall || '0'} mm</td></tr>
             <tr><th>Latitude</th><td>${nearestStation.Latitude || 'N/A'}</td></tr>
             <tr><th>Longitude</th><td>${nearestStation.Longitude || 'N/A'}</td></tr>
             <tr><th>Elevation</th><td>${nearestStation.Elevation ? nearestStation.Elevation + ' m' : 'N/A'}</td></tr>
@@ -408,7 +408,7 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
     
     return `
         <div class="popup-container">
-            <div class="popup-header">Combined Report</div>
+            <div class="popup-header">Generated Report</div>
             <div class="popup-scroll-container">
                 <div class="popup-section-title">1. Location Details (${layerName})</div>
                 <table class="popup-table">${susContent}</table>
@@ -495,6 +495,7 @@ const layerPromises = [
     createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2,})
 ];
 
+
 // --- 5. Synchronized AWS GeoJSON Layers ---
 
 let synchronizedLayers = []; 
@@ -577,7 +578,6 @@ initSynchronizedAWSLayer(
     'Landgrant AWS'
 );
 
-
 // --- 6. Controls Initialization ---
 
 const legendContainer = document.getElementById('legendModalContent');
@@ -626,6 +626,44 @@ function getStationIcon(stationName) {
     if (stationName && stationName.includes('SARAI')) return layerLogos[5];
     if (stationName && stationName.includes('PAGASA')) return layerLogos[7];
     return layerLogos[4]; 
+}
+
+// ✨ NEW: Scroll Alert Ticker Function (Updated with Area Data)
+function updateAlertTicker() {
+    const tickerEl = document.getElementById('ticker-text');
+    const tickerContainer = document.getElementById('alert-ticker');
+    if (!tickerEl || !tickerContainer || !cachedAWSData) return;
+    
+    let warningStations = [];
+    
+    cachedAWSData.forEach(station => {
+        const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
+        if (level >= 1) {
+            const name = station.StationName || station.Station || 'Unknown';
+            
+            // Extract Area (Municipality / Location)
+            const rawArea = station.Daterange || station.Municipality || station.LocationDetails || '';
+            const areaDisplay = (rawArea && rawArea.toLowerCase() !== 'n/a') ? ` (${rawArea})` : '';
+
+            let levelText = '';
+            let spanClass = '';
+            
+            if (level === 1) { levelText = 'Level 1 (Yellow)'; spanClass = 'level-1'; }
+            else if (level === 2) { levelText = 'Level 2 (Orange)'; spanClass = 'level-2'; }
+            else if (level === 3) { levelText = 'Level 3 (Red)'; spanClass = 'level-3'; }
+            
+            // Format: Station Name (Area) - Warning Level
+            warningStations.push(`<span class="${spanClass}">${name}${areaDisplay} - ${levelText}</span>`);
+        }
+    });
+    
+    if (warningStations.length > 0) {
+        tickerEl.innerHTML = `⚠️ POSSIBLE LANDSLIDE WARNING! Active Stations: &nbsp; ${warningStations.join(' &nbsp;•&nbsp; ')} &nbsp; | &nbsp; ⚠️ POSSIBLE LANDSLIDE WARNING! Please monitor local advisories and prepare for possible evacuation.`;
+        tickerContainer.style.backgroundColor = '#c0392b'; // Urgent Red
+    } else {
+        tickerEl.innerHTML = "✅ ALL STATIONS NORMAL. No active landslide warnings at this time. Network operational.";
+        tickerContainer.style.backgroundColor = '#27ae60'; // Safe Green
+    }
 }
 
 function processAWSData(data) {
@@ -698,6 +736,9 @@ function processAWSData(data) {
             warningLayerGroup.addLayer(marker);
         } catch (err) { console.error("Error processing station:", station.StationName, err); }
     });
+    
+    // Update the scrolling ticker after processing new data
+    updateAlertTicker();
 }
 
 function fetchAndRefreshData() {
@@ -1009,7 +1050,6 @@ function renderAllStationsGraph() {
     const ctx = document.getElementById('allStationsChart').getContext('2d');
     const countSpan = document.getElementById('awsTotalCount');
 
-    // Detect Current Theme for Chart Colors
     const isDark = document.body.classList.contains('dark-mode');
     const textColor = isDark ? '#e0e0e0' : '#666';
     const gridColor = isDark ? '#444' : 'rgba(0,0,0,0.1)';
@@ -1069,43 +1109,30 @@ function renderAllStationsGraph() {
                 borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.4)',
                 borderWidth: 1,
                 borderRadius: 4,
-                hoverBackgroundColor: 'rgba(52, 152, 219, 1)', // Turns blue on hover to indicate it's clickable
+                hoverBackgroundColor: 'rgba(52, 152, 219, 1)',
                 cursor: 'pointer'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            // ✨ NEW: Click-to-Zoom Functionality
             onClick: (event, activeElements) => {
                 if (activeElements.length > 0) {
                     const dataIndex = activeElements[0].index;
                     const clickedStationName = labels[dataIndex];
-
-                    // Find the station in our cached data
                     const station = cachedAWSData.find(s => (s.StationName || s.Station || 'Unknown') === clickedStationName);
 
                     if (station && station.Latitude && station.Longitude) {
                         const lat = parseFloat(station.Latitude);
                         const lng = parseFloat(station.Longitude);
-
                         if (!isNaN(lat) && !isNaN(lng)) {
-                            // 1. Close the modal to reveal the map
                             document.getElementById('allStationsGraphModal').style.display = "none";
-
-                            // 2. Smoothly fly to the station's location
                             map.flyTo([lat, lng], 14, { duration: 1.5 });
-
-                            // 3. Find the specific marker on the map and open its popup
                             warningLayerGroup.eachLayer(layer => {
                                 if (layer instanceof L.Marker) {
                                     const popup = layer.getPopup();
                                     if (popup && popup.getContent().includes(clickedStationName)) {
-                                        // Slight delay ensures the map panning finishes before popping up
-                                        setTimeout(() => {
-                                            layer.openPopup();
-                                            updatePropertiesTable("AWS Station", station);
-                                        }, 500); 
+                                        setTimeout(() => { layer.openPopup(); updatePropertiesTable("AWS Station", station); }, 500); 
                                     }
                                 }
                             });
@@ -1113,31 +1140,12 @@ function renderAllStationsGraph() {
                     }
                 }
             },
-            // Makes the mouse cursor a pointer when hovering over bars
-            onHover: (event, chartElement) => {
-                event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
-            },
+            onHover: (event, chartElement) => { event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'; },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Rainfall (mm)', font: { weight: 'bold' }, color: textColor },
-                    ticks: { color: textColor },
-                    grid: { color: gridColor }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: {
-                        maxRotation: 45,
-                        minRotation: 45,
-                        autoSkip: false,
-                        color: textColor
-                    }
-                }
+                y: { beginAtZero: true, title: { display: true, text: 'Rainfall (mm)', font: { weight: 'bold' }, color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
+                x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 45, autoSkip: false, color: textColor } }
             },
-            plugins: {
-                legend: { display: false },
-                tooltip: { callbacks: { label: function(context) { return ` ${context.raw} mm`; } } }
-            }
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(context) { return ` ${context.raw} mm`; } } } }
         }
     });
 }
@@ -1170,7 +1178,6 @@ function checkAutoDarkMode() {
         enableDarkMode(savedPref === 'true');
         return;
     }
-
     const currentHour = new Date().getHours();
     const isNight = currentHour >= 18 || currentHour < 6;
     enableDarkMode(isNight);
@@ -1180,16 +1187,11 @@ if (toggleDarkModeBtn) {
     toggleDarkModeBtn.addEventListener('click', () => {
         const isCurrentlyDark = document.body.classList.contains('dark-mode');
         enableDarkMode(!isCurrentlyDark);
-        
         localStorage.setItem('ligtas-dark-mode', !isCurrentlyDark);
-
         const allStationsGraphModal = document.getElementById('allStationsGraphModal');
-        if (allStationsGraphModal && allStationsGraphModal.style.display === "flex") {
-            renderAllStationsGraph();
-        }
+        if (allStationsGraphModal && allStationsGraphModal.style.display === "flex") { renderAllStationsGraph(); }
     });
 }
-
 checkAutoDarkMode();
 
 // ==========================================
@@ -1203,37 +1205,29 @@ const scrollRightBtn = document.getElementById('scrollRightBtn');
 function updateScrollArrows() {
     if (!subheaderMenuScroll || !scrollLeftBtn || !scrollRightBtn) return;
     
-    // Only apply arrow logic on desktop (hamburger menu handles mobile)
     if (window.innerWidth <= 768) {
         scrollLeftBtn.style.display = 'none';
         scrollRightBtn.style.display = 'none';
         return;
     }
 
-    // Check if the container's contents are wider than the screen
     const maxScrollLeft = subheaderMenuScroll.scrollWidth - subheaderMenuScroll.clientWidth;
     
     if (maxScrollLeft > 0) {
-        // Show left arrow if we have scrolled right at all
         scrollLeftBtn.style.display = subheaderMenuScroll.scrollLeft > 5 ? 'block' : 'none';
-        // Show right arrow if we haven't reached the end
         scrollRightBtn.style.display = subheaderMenuScroll.scrollLeft < (maxScrollLeft - 5) ? 'block' : 'none';
     } else {
-        // No overflow, hide both
         scrollLeftBtn.style.display = 'none';
         scrollRightBtn.style.display = 'none';
     }
 }
 
 if (subheaderMenuScroll) {
-    // Listen for scroll events and window resizing to recalculate arrows
     subheaderMenuScroll.addEventListener('scroll', updateScrollArrows);
     window.addEventListener('resize', updateScrollArrows);
-    // Initial check
     setTimeout(updateScrollArrows, 300);
 }
 
-// Button Click Actions (Scroll by 200px)
 if (scrollLeftBtn) {
     scrollLeftBtn.addEventListener('click', () => {
         subheaderMenuScroll.scrollBy({ left: -200, behavior: 'smooth' });
