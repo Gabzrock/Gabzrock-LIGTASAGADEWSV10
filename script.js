@@ -658,7 +658,7 @@ function updateAlertTicker() {
     });
     
     if (warningStations.length > 0) {
-        tickerEl.innerHTML = `⚠️ POSSIBLE LANDSLIDE WARNING! Active Stations: &nbsp; ${warningStations.join(' &nbsp;•&nbsp; ')} &nbsp; | &nbsp; ⚠️ POSSIBLE LANDSLIDE WARNING! Please monitor local advisories and prepare for possible evacuation. Report the landslide occurences using report a landslide button: MAGMASID
+        tickerEl.innerHTML = `⚠️ POSSIBLE LANDSLIDE WARNING! Active Stations: &nbsp; ${warningStations.join(' &nbsp;•&nbsp; ')} &nbsp; | &nbsp; ⚠️ POSSIBLE LANDSLIDE WARNING! Please monitor local advisories and prepare for possible evacuation. Report any landslide occurences using report a landslide button: MAGMASID
 MAG-ULAT, MAGING LIGTAS, PINAS!`;
         tickerContainer.style.backgroundColor = '#c0392b'; // Urgent Red
     } else {
