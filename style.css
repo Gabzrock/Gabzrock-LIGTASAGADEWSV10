@@ -372,63 +372,108 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
 #caption { margin: auto; display: block; width: 80%; max-width: 700px; text-align: center; color: #ccc; padding: 10px 0; font-size: 1.1rem; }
 
 /* =========================================
-   8. SCROLLING ALERT TICKER
+   8. MOBILE OVERRIDES
    ========================================= */
-#alert-ticker {
-    flex-shrink: 0;
-    height: 40px;
-    background-color: #27ae60; 
-    color: white;
-    display: flex;
-    align-items: center;
-    z-index: 4000;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
-    transition: background-color 0.5s;
-}
+.mobile-clock { display: none !important; }
+.hamburger-btn { display: none !important; background: none; border: none; color: white; font-size: 1.8rem; cursor: pointer; padding: 0 5px; transition: transform 0.2s; }
 
-.ticker-label {
-    background-color: rgba(0, 0, 0, 0.3);
-    color: #fff;
-    font-weight: bold;
-    padding: 0 15px;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    z-index: 2;
-    white-space: nowrap;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
+@media (max-width: 768px) {
+    #header2 { padding: 0 15px; }
+    .header-left { flex-grow: 1; overflow: hidden; } 
+    .header-title { font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #real-time, .desktop-clock { display: none !important; }
+    .hamburger-btn { display: block !important; }
+    .mobile-clock { display: block !important; text-align: center; color: #FFD700; font-size: 1.05rem; font-weight: bold; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.3); margin-bottom: 10px; }
+    
+    .scroll-arrow { display: none !important; }
+    #subheader-wrapper { background: none; box-shadow: none; position: static; }
 
-.ticker-content-wrapper {
-    flex-grow: 1;
-    overflow: hidden;
-    position: relative;
-    height: 100%;
-}
+    /* HAMBURGER MENU OVERRIDES WITH SCROLLBAR FIX */
+    #subheader {
+        display: none !important; 
+        flex-direction: column; 
+        position: absolute; 
+        top: 50px; left: 0; width: 100%;
+        background: linear-gradient(135deg, rgba(26, 59, 66, 0.98), rgba(38, 129, 113, 0.98));
+        padding: 20px; 
+        padding-bottom: 80px; 
+        height: auto;
+        max-height: calc(100vh - 50px);
+        overflow-y: auto; 
+        overflow-x: hidden;
+        align-items: flex-start;
+        gap: 25px;
+        z-index: 9999 !important;
+    }
+    #subheader.show-menu { display: flex !important; animation: slideDown 0.2s ease-out forwards; }
+    
+    #subheader::-webkit-scrollbar {
+        display: block !important; 
+        width: 6px;
+    }
+    #subheader::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05); 
+    }
+    #subheader::-webkit-scrollbar-thumb {
+        background: rgba(255, 215, 0, 0.6); 
+        border-radius: 10px;
+    }
+    
+    .button-group-container { width: 100%; }
+    
+    .group-label {
+        color: #FFD700;
+        font-size: 0.75rem;
+        margin-bottom: 5px;
+        border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+        padding-bottom: 3px;
+    }
 
-.ticker-text {
-    position: absolute;
-    white-space: nowrap;
-    line-height: 40px;
-    font-weight: 600;
-    font-size: 0.8rem;
-    animation: ticker-scroll 150s linear infinite; /* Adjusted to 60s for slower scroll */
-}
+    .button-pod {
+        flex-direction: column;
+        width: 100%;
+        background: none;
+        padding: 0;
+        border: none;
+        gap: 10px;
+    }
 
-/* Pause animation on hover */
-.ticker-content-wrapper:hover .ticker-text {
-    animation-play-state: paused;
-}
+    .nav-btn {
+        width: 100%;
+        padding: 12px;
+        text-align: center;
+        border-radius: 8px;
+    }
 
-.ticker-text span.level-1 { color: #FFD700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); } 
-.ticker-text span.level-2 { color: #FFA500; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); } 
-.ticker-text span.level-3 { color: #ffcccc; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); } 
+    #subheader:not(.show-menu), .header-controls:not(.show-menu) { display: none !important; height: 0 !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; overflow: hidden !important; }
+    
+  .map-panel-container {
+        overflow: hidden; /* Prevents double scrollbars on mobile */
+        padding: 5px; /* Slightly tighter padding to maximize map space */
+        background-color: #f4f4f4;
+        
+        /* Use 'dvh' to account for mobile address bars shrinking/growing */
+        height: calc(100vh - 90px); /* Fallback for older browsers */
+        height: calc(100dvh - 90px); /* Subtract Header (50px) + Ticker (40px) */
+        
+        display: flex;
+        flex-direction: column;
+    }
 
-@keyframes ticker-scroll {
-    0% { transform: translateX(100vw); }
-    100% { transform: translateX(-100%); }
+    #map {
+        min-height: 0 !important; 
+        height: 100%;
+        flex-grow: 1; 
+        
+        border-radius: 12px;
+        border: 1px solid #ddd;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .ui-modal-content { width: 95%; max-width: none; }
+    .splash-content h1 { font-size: 1.5rem; }
+    .splash-logos img { height: 80px; }
 }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
 /* =========================================
    9. DARK MODE THEME
@@ -479,138 +524,60 @@ body.dark-mode .leaflet-control-custom:hover { background-color: #333 !important
 body.dark-mode .chart-scroll-wrapper { border: 1px solid #444; }
 
 /* =========================================
-   10. MOBILE OVERRIDES
+   14. SCROLLING ALERT TICKER
    ========================================= */
-@media (max-width: 768px) {
-    #header2 { padding: 0 15px; }
-    .header-left { flex-grow: 1; overflow: hidden; } 
-    .header-title { font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #real-time, .desktop-clock { display: none !important; }
-    .hamburger-btn { display: block !important; }
-    .mobile-clock { display: block !important; text-align: center; color: #FFD700; font-size: 1.05rem; font-weight: bold; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.3); margin-bottom: 10px; }
-    
-    .scroll-arrow { display: none !important; }
-    #subheader-wrapper { background: none; box-shadow: none; position: static; }
-
-    /* HAMBURGER MENU OVERRIDES WITH SCROLLBAR FIX */
-    #subheader {
-        display: none !important; 
-        flex-direction: column; 
-        position: absolute; 
-        top: 50px; left: 0; width: 100%;
-        background: linear-gradient(135deg, rgba(26, 59, 66, 0.98), rgba(38, 129, 113, 0.98));
-        padding: 20px; 
-        padding-bottom: 80px; 
-        height: auto;
-        max-height: calc(100vh - 50px);
-        overflow-y: auto; 
-        overflow-x: hidden;
-        align-items: flex-start;
-        gap: 25px;
-        z-index: 9999 !important;
-    }
-    #subheader.show-menu { display: flex !important; animation: slideDown 0.2s ease-out forwards; }
-    
-    .button-group-container { width: 100%; }
-    
-    .group-label {
-        color: #FFD700;
-        font-size: 0.75rem;
-        margin-bottom: 5px;
-        border-bottom: 1px solid rgba(255, 215, 0, 0.3);
-        padding-bottom: 3px;
-    }
-
-    .button-pod {
-        flex-direction: column;
-        width: 100%;
-        background: none;
-        padding: 0;
-        border: none;
-        gap: 10px;
-    }
-
-    .nav-btn {
-        width: 100%;
-        padding: 12px;
-        text-align: center;
-        border-radius: 8px;
-    }
-
-    #subheader:not(.show-menu), .header-controls:not(.show-menu) { display: none !important; height: 0 !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; overflow: hidden !important; }
-    
-.map-panel-container {
-        overflow: hidden; 
-        padding: 10px; 
-        background-color: #f4f4f4;
-        
-        /* 👇 CHANGED: Reduces the map to exactly 60% of the mobile screen height */
-        height: 70vh; 
-        height: 70dvh; 
-        
-        display: flex;
-        flex-direction: column;
-        
-        /* 👇 Optional: Adds some space below the map so the ticker doesn't touch it immediately */
-        margin-bottom: 15px; 
-    }
-
-    #map {
-        min-height: 0 !important; 
-        height: 90%;
-        flex-grow: 1; 
-        border-radius: 12px;
-        border: 1px solid #ddd;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .ui-modal-content { width: 95%; max-width: none; }
-    .splash-content h1 { font-size: 1.5rem; }
-    .splash-logos img { height: 80px; }
+#alert-ticker {
+    flex-shrink: 0;
+    height: 40px;
+    background-color: #27ae60; 
+    color: white;
+    display: flex;
+    align-items: center;
+    z-index: 4000;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
+    transition: background-color 0.5s;
 }
-@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* =========================================
-   11. VISIBLE MOBILE SCROLLBARS
-   ========================================= */
-@media (max-width: 768px) {
-    .map-panel-container {
-        overflow-y: auto !important; 
-    }
+.ticker-label {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    font-weight: bold;
+    padding: 0 15px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    z-index: 2;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
 
-    .map-panel-container::-webkit-scrollbar,
-    .panel-content::-webkit-scrollbar,
-    #subheader::-webkit-scrollbar,
-    .chart-scroll-wrapper::-webkit-scrollbar {
-        display: block !important;
-        width: 6px;  
-        height: 8px; 
-        -webkit-appearance: none;
-    }
+.ticker-content-wrapper {
+    flex-grow: 1;
+    overflow: hidden;
+    position: relative;
+    height: 100%;
+}
 
-    .map-panel-container::-webkit-scrollbar-track,
-    .panel-content::-webkit-scrollbar-track,
-    #subheader::-webkit-scrollbar-track,
-    .chart-scroll-wrapper::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.05);
-        border-radius: 10px;
-    }
+.ticker-text {
+    position: absolute;
+    white-space: nowrap;
+    line-height: 40px;
+    font-weight: 600;
+    font-size: 1.05rem;
+    animation: ticker-scroll 90s linear infinite;
+}
 
-    .map-panel-container::-webkit-scrollbar-thumb,
-    .panel-content::-webkit-scrollbar-thumb,
-    #subheader::-webkit-scrollbar-thumb,
-    .chart-scroll-wrapper::-webkit-scrollbar-thumb {
-        background-color: var(--primary-color);
-        border-radius: 10px;
-    }
+/* Pause animation on hover */
+.ticker-content-wrapper:hover .ticker-text {
+    animation-play-state: paused;
+}
 
-    body.dark-mode .map-panel-container::-webkit-scrollbar-track,
-    body.dark-mode .panel-content::-webkit-scrollbar-track,
-    body.dark-mode #subheader::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-    }
-    body.dark-mode .map-panel-container::-webkit-scrollbar-thumb,
-    body.dark-mode .panel-content::-webkit-scrollbar-thumb,
-    body.dark-mode #subheader::-webkit-scrollbar-thumb {
-        background-color: var(--light-teal);
-    }
+.ticker-text span.level-1 { color: #FFD700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); } 
+.ticker-text span.level-2 { color: #FFA500; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); } 
+.ticker-text span.level-3 { color: #ffcccc; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); } 
+
+@keyframes ticker-scroll {
+    0% { transform: translateX(100vw); }
+    100% { transform: translateX(-100%); }
 }
