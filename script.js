@@ -397,7 +397,7 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
             <tr><th>Nearest Station</th><td>${nearestStation.StationName || nearestStation.Station}</td></tr>
             <tr><th>Distance</th><td>${nearestStation.distance} km</td></tr>
             <tr><th>Warning Level</th><td style="background-color:${color}; font-weight:bold;">Level ${wLevel}</td></tr>
-            <tr><th>Rainfall (24h)</th><td>${nearestStation.R24H || nearestStation.Rainfall || '0'} mm</td></tr>
+            <tr><th>Rainfall Antecedent+Cumulative (7-days)</th><td>${nearestStation.R24H || nearestStation.Rainfall || '0'} mm</td></tr>
             <tr><th>Latitude</th><td>${nearestStation.Latitude || 'N/A'}</td></tr>
             <tr><th>Longitude</th><td>${nearestStation.Longitude || 'N/A'}</td></tr>
             <tr><th>Elevation</th><td>${nearestStation.Elevation ? nearestStation.Elevation + ' m' : 'N/A'}</td></tr>
