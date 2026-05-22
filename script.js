@@ -619,6 +619,11 @@ initSynchronizedAWSLayer(
     'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/Siniloan%20AWS%20-%20trial2.geojson',
     'Landgrant AWS'
 );
+initSynchronizedAWSLayer(
+    'NAC', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_NAC%20AWS_RIL_HL.geojson',
+    'LIGTAS NAC 2026'
+);
 
 // --- 6. Controls Initialization ---
 
