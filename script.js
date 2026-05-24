@@ -364,7 +364,6 @@ function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
     } catch(e) { }
     return priorityStation || absoluteNearest;
 }
-
 function getNearbyLandslideCount(latlng, radiusKm = 5) {
     if (!landslideFeatures || landslideFeatures.length === 0) return 0;
     let count = 0;
@@ -521,74 +520,105 @@ function syncAwsLayersWithData() {
     if (!cachedAWSData || cachedAWSData.length === 0) return;
     
     synchronizedLayers.forEach(layerData => {
-        // Find the AWS station that matches this layer's target name
-        const station = cachedAWSData.find(s => {
+        
+        // Find ALL matching stations
+        const matchingStations = cachedAWSData.filter(s => {
             const sName = String(s.StationName || s.Station || '').toLowerCase();
             return sName.includes(layerData.targetAws.toLowerCase());
         });
 
+        let station = null;
+        let warningLevel = 0; // Default starting level
+
+        if (matchingStations.length > 0) {
+            // Sort matching stations by Warning Level (Highest threat first)
+            matchingStations.sort((a, b) => {
+                const levelA = parseInt(String(a.RainfallLandslidethresholdwarninglevel).trim()) || 0;
+                const levelB = parseInt(String(b.RainfallLandslidethresholdwarninglevel).trim()) || 0;
+                return levelB - levelA; 
+            });
+            station = matchingStations[0];
+        }
+
         if (station) {
             const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
-            let warningLevel = parseInt(rawLevel); 
+            warningLevel = parseInt(rawLevel) || 0; 
             let targetColor = '#808080'; 
             
-            // Determine Color based on AWS Warning Level
             if (warningLevel === 1) targetColor = 'yellow'; 
             else if (warningLevel === 2) targetColor = 'orange'; 
             else if (warningLevel === 3) targetColor = 'red'; 
             else if (warningLevel === 0 || rawLevel === '0') targetColor = 'green'; 
             
-            // Apply new style to the GeoJSON layer
-            layerData.layer.setStyle({ color: targetColor, weight: 1, opacity: 0.9 });
+            // Apply color to the FILL AREA (the range) as well as the border
+            layerData.layer.setStyle({ 
+                color: targetColor, 
+                fillColor: targetColor, 
+                fillOpacity: 0.45, 
+                weight: 0.9, 
+                opacity: 0.9 
+            });
+
+            // Store this layer's current active level so we can sort its Z-Index later
+            layerData.currentLevel = warningLevel;
             
-            // Update popups for every feature inside this synchronized layer
             layerData.layer.eachLayer(featureLayer => {
-                
-                // 1. Find the geographic center of the clicked feature
                 let centerLatLng;
                 if (featureLayer.getBounds) {
-                    centerLatLng = featureLayer.getBounds().getCenter(); // For Lines/Polygons
+                    centerLatLng = featureLayer.getBounds().getCenter(); 
                 } else if (featureLayer.getLatLng) {
-                    centerLatLng = featureLayer.getLatLng(); // For Points
+                    centerLatLng = featureLayer.getLatLng(); 
                 }
 
                 let lsCount = 0;
-                let calculatedDistance = "Unknown";
+                let finalStationDisplay = { ...station, distance: "Unknown" };
 
                 if (centerLatLng) {
-                    // 2. Get historical context
-                    lsCount = getNearbyLandslideCount(centerLatLng, 5); // 5km radius
+                    lsCount = getNearbyLandslideCount(centerLatLng, 5); 
+                    
+                    // Apply Susceptibility Map Proximity Logic
+                    const priorityNearbyStation = findPriorityStationNearby(centerLatLng, 20);
 
-                    // ✨ 3. THE FIX: Calculate actual distance to the AWS station
-                    const stLat = parseFloat(station.Latitude);
-                    const stLng = parseFloat(station.Longitude);
-
-                    if (!isNaN(stLat) && !isNaN(stLng)) {
-                        const stationLatLng = L.latLng(stLat, stLng);
-                        // Convert meters to kilometers and round to 2 decimals
-                        calculatedDistance = (centerLatLng.distanceTo(stationLatLng) / 1000).toFixed(2);
+                    if (priorityNearbyStation) {
+                        finalStationDisplay = priorityNearbyStation;
+                    } else {
+                        const stLat = parseFloat(station.Latitude);
+                        const stLng = parseFloat(station.Longitude);
+                        if (!isNaN(stLat) && !isNaN(stLng)) {
+                            const stationLatLng = L.latLng(stLat, stLng);
+                            finalStationDisplay.distance = (centerLatLng.distanceTo(stationLatLng) / 1000).toFixed(2);
+                        }
                     }
                 }
 
-                // 4. Format the station so the Combined Report displays the true distance
-                const linkedStationDisplay = { ...station, distance: calculatedDistance };
-
-                // 5. Generate the rich Combined Report
                 const reportContent = generateCombinedReport(
                     layerData.name, 
                     featureLayer.feature.properties || {}, 
-                    linkedStationDisplay, 
+                    finalStationDisplay, 
                     lsCount
                 );
 
-                // 6. Safely bind the popup
                 featureLayer.bindPopup(reportContent); 
                 
-                // 7. Update the sidebar table when the popup opens
                 featureLayer.off('popupopen').on('popupopen', () => { 
                     updatePropertiesTable(layerData.name, featureLayer.feature.properties || {}); 
                 });
             });
+        } else {
+            // If no station matched, ensure the level defaults to 0
+            layerData.currentLevel = 0;
+        }
+    });
+
+    // ✨ NEW: VISUAL OVERLAP PROTOCOL (Z-INDEX SORTING)
+    // 1. Sort the array of synchronized layers from lowest threat (0) to highest threat (3)
+    synchronizedLayers.sort((a, b) => (a.currentLevel || 0) - (b.currentLevel || 0));
+    
+    // 2. Loop through them and bring them to the front of the map. 
+    // Because Level 3 is processed last, it is guaranteed to rest on top of all other layers.
+    synchronizedLayers.forEach(layerData => {
+        if (layerData.layer && typeof layerData.layer.bringToFront === 'function') {
+            layerData.layer.bringToFront();
         }
     });
 }
@@ -624,7 +654,11 @@ initSynchronizedAWSLayer(
     'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_NAC%20AWS_RIL_HL.geojson',
     'LIGTAS NAC 2026'
 );
-
+initSynchronizedAWSLayer(
+    'PGPC', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_PGPC%20AWS_RIL_HL.geojson',
+    'VOTE PGPC AWS'
+);
 // --- 6. Controls Initialization ---
 
 const legendContainer = document.getElementById('legendModalContent');
@@ -674,7 +708,7 @@ function getStationIcon(stationName) {
     return layerLogos[4]; 
 }
 
-// ✨ NEW: Scroll Alert Ticker Function (Updated with Area Data)
+// ✨ NEW: Scroll Alert Ticker Function (Prioritizes Level 3 Warnings)
 function updateAlertTicker() {
     const tickerEl = document.getElementById('ticker-text');
     const tickerContainer = document.getElementById('alert-ticker');
@@ -682,7 +716,14 @@ function updateAlertTicker() {
     
     let warningStations = [];
     
-    cachedAWSData.forEach(station => {
+    // Sort stations specifically for the ticker (Highest Level 3 first)
+    const prioritySortedData = [...cachedAWSData].sort((a, b) => {
+        const levelA = parseInt(a.RainfallLandslidethresholdwarninglevel) || 0;
+        const levelB = parseInt(b.RainfallLandslidethresholdwarninglevel) || 0;
+        return levelB - levelA; // Descending order
+    });
+
+    prioritySortedData.forEach(station => {
         const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
         if (level >= 1) {
             const name = station.StationName || station.Station || 'Unknown';
