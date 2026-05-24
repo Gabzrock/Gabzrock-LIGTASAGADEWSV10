@@ -564,8 +564,8 @@ body.dark-mode .chart-scroll-wrapper { border: 1px solid #444; }
     white-space: nowrap;
     line-height: 40px;
     font-weight: 600;
-    font-size: 1.0rem;
-    animation: ticker-scroll 120s linear infinite;
+    font-size: 1.05rem;
+    animation: ticker-scroll 90s linear infinite;
 }
 
 /* Pause animation on hover */
