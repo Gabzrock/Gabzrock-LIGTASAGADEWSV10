@@ -625,9 +625,9 @@ function syncAwsLayersWithData() {
 
 // Example 1: Buguias Road Network
 initSynchronizedAWSLayer(
-    'Landgrant', 
-    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/Siniloan%20AWS%20-%20trial2.geojson',
-    'Landgrant AWS'
+    'LANDGRANT', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Landgrant%20AWS_RIL_HL.geojson',
+    'LIGTAS LANDGRANT AWS'
 );
 initSynchronizedAWSLayer(
     'NAC', 
