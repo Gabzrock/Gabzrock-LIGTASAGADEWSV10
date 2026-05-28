@@ -554,9 +554,9 @@ function syncAwsLayersWithData() {
             layerData.layer.setStyle({ 
                 color: targetColor, 
                 fillColor: targetColor, 
-                fillOpacity: 0.45, 
-                weight: 0.9, 
-                opacity: 0.9 
+                fillOpacity: 0.30, 
+                weight: 0.6, 
+                opacity: 0.6 
             });
 
             // Store this layer's current active level so we can sort its Z-Index later
@@ -625,26 +625,6 @@ function syncAwsLayersWithData() {
 
 // Example 1: Buguias Road Network
 initSynchronizedAWSLayer(
-    'Buguias', 
-    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_BUGUIAS_AWS.geojson',
-    'Buguias AWS'
-);
-initSynchronizedAWSLayer(
-    'Mankayan', 
-    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_MANKAYAN_AWS.geojson',
-    'Mankayan AWS'
-);
-initSynchronizedAWSLayer(
-    'Bokod', 
-    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_BOKOD_AWS.geojson',
-    'Bokod AWS'
-);
-initSynchronizedAWSLayer(
-    'Itogon', 
-    'https://raw.githubusercontent.com/Gabzrock/AWS_BUFFER_CROPPED/refs/heads/main/LIGTAS_ITOGON_AWS.geojson',
-    'Itogon AWS'
-);
-initSynchronizedAWSLayer(
     'Landgrant', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/Siniloan%20AWS%20-%20trial2.geojson',
     'Landgrant AWS'
@@ -658,6 +638,40 @@ initSynchronizedAWSLayer(
     'PGPC', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_PGPC%20AWS_RIL_HL.geojson',
     'VOTE PGPC AWS'
+);
+initSynchronizedAWSLayer(
+    'MANKAYAN', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Mankayan%20AWS_RIL_HL.geojson',
+    'LIGTAS MANKAYAN AWS'
+);initSynchronizedAWSLayer(
+    'BUGUIAS', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Buguias%20AWS_RIL_HL.geojson',
+    'LIGTAS BUGUIAS AWS'
+);
+initSynchronizedAWSLayer(
+    'BOKOD', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Bokod%20AWS_RIL_HL.geojson',
+    'LIGTAS BOKOD AWS'
+);
+initSynchronizedAWSLayer(
+    'COROZ', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Coroz%20AWS_RIL_HL.geojson',
+    'LIGTAS COROZ AWS'
+);
+initSynchronizedAWSLayer(
+    'ITOGON', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Itogon%20AWS_RIL_HL.geojson',
+    'LIGTAS ITOGON AWS'
+);
+initSynchronizedAWSLayer(
+    'CATANAUAN', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catanauan%20AWS_RIL_HL.geojson',
+    'LIGTAS CATANAUAN AWS'
+);
+initSynchronizedAWSLayer(
+    'CATARMAN', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catarman%20AWS_RIL_HL.geojson',
+    'LIGTAS UEP-CATARMAN AWS'
 );
 // --- 6. Controls Initialization ---
 
