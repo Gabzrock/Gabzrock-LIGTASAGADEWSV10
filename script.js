@@ -548,7 +548,7 @@ function syncAwsLayersWithData() {
             if (warningLevel === 1) targetColor = 'yellow'; 
             else if (warningLevel === 2) targetColor = 'orange'; 
             else if (warningLevel === 3) targetColor = 'red'; 
-            else if (warningLevel === 0 || rawLevel === '0') targetColor = 'green'; 
+            else if (warningLevel === 0 || rawLevel === '0') targetColor = 'transparent'; 
             
             // Apply color to the FILL AREA (the range) as well as the border
             layerData.layer.setStyle({ 
