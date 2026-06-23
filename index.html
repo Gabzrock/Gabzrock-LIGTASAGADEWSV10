@@ -1,5 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <title>LIGTAS-AGAD RILEWS | Rainfall-Induced Landslide Early Warning System V18-Advance Sorting Protocol</title>
+    <link rel="stylesheet" href="./style.css">
+
+  </head>
+    
+  <body>
+  <!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -68,15 +79,15 @@
                 </div>
             </div>
 
-            <div class="button-group-container">
-                <span class="group-label">DATA</span>
-                <div class="button-pod">
-                    <button class="nav-btn btn-danger" id="toggle-buffer">AWS Warning</button>
-                    <button class="nav-btn btn-success" id="openAllStationsGraphBtn">All Stations</button>
-                    <button class="nav-btn" onclick="AWSbutton()">Landslide Advisories</button>
-                     <button class="nav-btn" onclick="window.open('https://www.pagasa.dost.gov.ph/weather/weather-advisory', '_blank')">PAGASA Advisories</button>
-                </div>
-            </div>
+<div class="button-group-container">
+    <span class="group-label">DATA</span>
+    <div class="button-pod">
+        <button class="nav-btn btn-danger" id="toggle-buffer">AWS Warning</button>
+        <button class="nav-btn btn-success" id="openAllStationsGraphBtn">All Stations</button>
+        <button class="nav-btn" id="openAwsAdvisoriesBtn">AWS Advisories</button>
+        <button class="nav-btn" onclick="window.open('https://www.pagasa.dost.gov.ph/weather/weather-advisory', '_blank')">PAGASA Advisories</button>
+    </div>
+</div>
 
             <div class="button-group-container">
                 <span class="group-label">VIEWS</span>
@@ -192,7 +203,40 @@
         <img class="modal-content" id="img01">
         <div id="caption"></div>
     </div>
+<div id="awsAdvisoriesModal" class="ui-modal">
+    <div class="ui-modal-content" style="max-width: 850px; width: 95%;">
+        <span class="close-ui-modal" id="closeAwsAdvisoriesBtn">&times;</span>
+        <h3>📋 AWS Station Advisories</h3>
+        <p style="text-align: center; font-size: 0.95rem; color: #666; margin-bottom: 10px;">
+            Current Status & 20km Buffer Coverage
+        </p>
+        
+        <div class="panel-content" id="awsAdvisoriesPrintArea" style="border: 1px solid #eee; border-radius: 4px; padding: 10px;">
+            <table class="popup-table" id="awsAdvisoriesTable">
+                <thead>
+                    <tr>
+                        <th>Station Name</th>
+                        <th>Covered Area (Municipality)</th>
+                        <th>Rainfall (mm)</th>
+                        <th>Warning Level</th>
+                    </tr>
+                </thead>
+                <tbody id="awsAdvisoriesTableBody">
+                    <tr><td colspan="4" style="text-align:center;">Loading data...</td></tr>
+                </tbody>
+            </table>
+        </div>
 
+        <div style="text-align: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+            <button id="downloadAwsAdvisoriesPdfBtn" class="nav-btn btn-danger" style="padding: 8px 25px; font-size: 1rem;">📥 Download Table as PDF</button>
+        </div>
+    </div>
+</div>
     <script src="./script.js"></script>
 </body>
+</html>
+    <script  src="./script.js"></script>
+
+  </body>
+  
 </html>
