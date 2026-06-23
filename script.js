@@ -261,25 +261,21 @@ try {
         });
     }
 
-// --- Updated Map Location Found Event (Handles both Manual Assessment and Background Tracking) ---
-map.on('locationfound', function(e) {
-    hideLoadingScreen(); 
-    const latlng = e.latlng;
-    const priorityStation = findPriorityStationNearby(latlng, 20); 
-    const lsCount = getNearbyLandslideCount(latlng, 5); 
-    const userProperties = { "Location Type": "User Current Location", "Latitude": latlng.lat.toFixed(5), "Longitude": latlng.lng.toFixed(5) };
-    const reportContent = generateCombinedReport("User Location", userProperties, priorityStation, lsCount);
-    
-    // Check if the system is currently running background automation tracking
-    if (typeof isWatchingAlerts !== 'undefined' && isWatchingAlerts) {
-        // Direct payload straight to mobile phone background engine
-        checkAndTriggerMobileNotification(priorityStation);
-    } else {
-        // Standard behavior: Trigger on-screen interactive map popups
-        L.popup().setLatLng(latlng).setContent(reportContent).openOn(map);
-        updatePropertiesTable("User Location", userProperties);
-    }
-});
+    map.on('locationfound', function(e) {
+        hideLoadingScreen(); 
+        const latlng = e.latlng;
+        const priorityStation = findPriorityStationNearby(latlng, 20); 
+        const lsCount = getNearbyLandslideCount(latlng, 5); 
+        const userProperties = { "Location Type": "User Current Location", "Latitude": latlng.lat.toFixed(5), "Longitude": latlng.lng.toFixed(5) };
+        const reportContent = generateCombinedReport("User Location", userProperties, priorityStation, lsCount);
+        
+        if (typeof isWatchingAlerts !== 'undefined' && isWatchingAlerts) {
+            checkAndTriggerMobileNotification(priorityStation);
+        } else {
+            L.popup().setLatLng(latlng).setContent(reportContent).openOn(map);
+            updatePropertiesTable("User Location", userProperties);
+        }
+    });
     
     map.on('locationerror', function(e) { hideLoadingScreen(); showError("Could not acquire GPS location. Check permissions.", 'warning'); });
     
@@ -368,12 +364,10 @@ function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
             const slatlng = L.latLng(lat, lng);
             const distKm = latlng.distanceTo(slatlng) / 1000;
 
-            // STRICTLY enforce the 20km limit
             if (distKm <= maxRadiusKm) {
                 const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
                 let level = parseInt(rawLevel); if (isNaN(level)) level = 0;
 
-                // Prioritize highest warning level, then closest distance
                 if (level > highestWarningLevel || (level === highestWarningLevel && distKm < minDistanceForHighest)) {
                     highestWarningLevel = level;
                     minDistanceForHighest = distKm;
@@ -382,8 +376,6 @@ function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
             }
         });
     } catch(e) { console.error("Error finding nearest station:", e); }
-
-    // Returns null if absolutely no station is found within maxRadiusKm
     return priorityStation;
 }
 
@@ -411,7 +403,6 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
         susContent += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
     }
 
-    // Default message when outside of the 20km coverage radius
     let stationContent = `
         <tr>
             <td colspan="2" style="text-align:center; padding:15px; color:#c0392b; font-weight:bold;">
@@ -419,7 +410,6 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
             </td>
         </tr>`;
 
-    // Only populate if a valid station is strictly within range
     if (nearestStation) {
         const wLevel = nearestStation.RainfallLandslidethresholdwarninglevel;
         const color = wLevel == 1 ? 'yellow' : (wLevel == 2 ? 'orange' : (wLevel == 3 ? 'red' : 'green'));
@@ -525,7 +515,6 @@ const layerPromises = [
     createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 0.2,}),
     createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2,})
 ];
-
 
 // ==========================================
 // 5. SYNCHRONIZED AWS GEOJSON LAYERS
@@ -1074,14 +1063,12 @@ if (hamburgerBtn && subheaderMenu) {
 // (WITH REGIONAL FILTERING & CRASH PROTECTION)
 // ==========================================
 
-// --- Helper Function: Fuzzy Match CSV Headers ---
 function getStationCategory(station) {
     if (!station) return 'Uncategorized';
     const cat = station.Site_Category || station['Site Category'] || station.Category || station.Region;
     return (cat && String(cat).trim() !== '') ? String(cat).trim() : 'Uncategorized';
 }
 
-// --- DOM Elements (Safely assigned) ---
 let rainfallChartInstance = null;
 const allStationsGraphModal = document.getElementById('allStationsGraphModal');
 const closeAllStationsGraphBtn = document.getElementById('closeAllStationsGraphBtn');
@@ -1094,7 +1081,6 @@ const openAwsAdvisoriesBtn = document.getElementById('openAwsAdvisoriesBtn');
 const closeAwsAdvisoriesBtn = document.getElementById('closeAwsAdvisoriesBtn');
 const downloadAwsAdvisoriesPdfBtn = document.getElementById('downloadAwsAdvisoriesPdfBtn');
 
-// --- 11A. GRAPH MODAL LOGIC ---
 if (openAllStationsGraphBtn) {
     openAllStationsGraphBtn.onclick = () => {
         if(allStationsGraphModal) allStationsGraphModal.style.display = "flex";
@@ -1210,7 +1196,6 @@ if (downloadGraphBtn) {
     };
 }
 
-// --- 11B. AWS ADVISORIES MODAL LOGIC ---
 if (openAwsAdvisoriesBtn) {
     openAwsAdvisoriesBtn.onclick = () => {
         if(awsAdvisoriesModal) awsAdvisoriesModal.style.display = "flex";
@@ -1264,9 +1249,6 @@ function renderAwsAdvisoriesTable() {
     tbody.appendChild(fragment);
 }
 
-// =========================================================
-// UPGRADED PDF DOWNLOAD LOGIC (REGION PAGINATION)
-// =========================================================
 if (downloadAwsAdvisoriesPdfBtn) {
     downloadAwsAdvisoriesPdfBtn.onclick = function() {
         const originalBtnText = this.innerText; 
@@ -1280,7 +1262,6 @@ if (downloadAwsAdvisoriesPdfBtn) {
         
         const timeStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         
-        // Document Header
         let fullHtml = `
             <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #008080; padding-bottom: 10px;">
                 <h2 style="color: #008080; margin: 0; font-size: 1.6rem;">LIGTAS-AGAD RILEWS</h2>
@@ -1289,7 +1270,6 @@ if (downloadAwsAdvisoriesPdfBtn) {
             </div>
         `;
         
-        // Group Data by Site_Category
         const groupedData = (cachedAWSData || []).reduce((acc, station) => {
             const cat = getStationCategory(station);
             if (!acc[cat]) acc[cat] = [];
@@ -1302,10 +1282,7 @@ if (downloadAwsAdvisoriesPdfBtn) {
         if (regions.length === 0) {
             fullHtml += '<p style="text-align:center; padding:20px; font-weight:bold;">No station data available</p>';
         } else {
-            // Iterate over each region and create a completely separate table
             regions.forEach((category, index) => {
-                
-                // Force a page break before every region EXCEPT the very first one
                 const pageBreakStyle = index > 0 ? 'page-break-before: always; margin-top: 20px;' : '';
 
                 fullHtml += `
@@ -1367,19 +1344,13 @@ if (downloadAwsAdvisoriesPdfBtn) {
         printContainer.innerHTML = fullHtml;
 
         html2pdf().from(printContainer).set({ 
-            margin: [15, 10, 15, 10], 
-            filename: 'LIGTAS_Regional_AWS_Advisories_Report.pdf', 
-            image: { type: 'jpeg', quality: 0.98 }, 
-            html2canvas: { scale: 2, useCORS: true }, 
-            pagebreak: { mode: ['css', 'legacy'] }, 
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } 
+            margin: [15, 10, 15, 10], filename: 'LIGTAS_Regional_AWS_Advisories_Report.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, pagebreak: { mode: ['css', 'legacy'] }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } 
         }).save()
             .then(() => { this.innerText = originalBtnText; this.disabled = false; })
             .catch(err => { console.error("PDF Error:", err); showError("Failed to generate report.", 'warning'); this.innerText = "Retry PDF"; this.disabled = false; });
     };
 }
 
-// --- General Modal Window Click Listener ---
 window.addEventListener('click', (e) => { 
     if (e.target === awsAdvisoriesModal) awsAdvisoriesModal.style.display = "none"; 
     if (e.target === allStationsGraphModal) allStationsGraphModal.style.display = "none"; 
@@ -1423,7 +1394,6 @@ if (toggleDarkModeBtn) {
         const isCurrentlyDark = document.body.classList.contains('dark-mode');
         enableDarkMode(!isCurrentlyDark);
         localStorage.setItem('ligtas-dark-mode', !isCurrentlyDark);
-        const allStationsGraphModal = document.getElementById('allStationsGraphModal');
         if (allStationsGraphModal && allStationsGraphModal.style.display === "flex") { renderAllStationsGraph(); }
     });
 }
@@ -1473,6 +1443,7 @@ if (scrollRightBtn) {
         subheaderMenuScroll.scrollBy({ left: 200, behavior: 'smooth' });
     });
 }
+
 // =========================================================
 // 14. AUTOMATED LOCATION-BASED MOBILE NOTIFICATION SYSTEM
 // =========================================================
@@ -1482,21 +1453,32 @@ let lastNotifiedLevel = -1;
 
 const toggleAutoAlertsBtn = document.getElementById('toggleAutoAlertsBtn');
 
+// Sync tracking button states right away when system loads based on real permissions
+function syncAlertUiPermissionState() {
+    if (!toggleAutoAlertsBtn || !("Notification" in window)) return;
+    if (Notification.permission === "denied") {
+        toggleAutoAlertsBtn.innerText = "⚠️ Alerts Blocked";
+    } else if (Notification.permission === "granted" && !isWatchingAlerts) {
+        toggleAutoAlertsBtn.innerText = "🔔 Enable Track Alerts";
+    }
+}
+setTimeout(syncAlertUiPermissionState, 1000);
+
 if (toggleAutoAlertsBtn) {
     toggleAutoAlertsBtn.onclick = function() {
         if (!isWatchingAlerts) {
-            
             if (!("Notification" in window)) {
-                showError("Your browser does not support native mobile push alerts.", "warning");
+                showError("Your mobile device or browser does not support native background push alerts.", "warning");
                 return;
             }
             
-            // Check if they are already hard-locked out
+            // Proactively evaluate if the browser is hard-locked to denied status
             if (Notification.permission === "denied") {
                 issuePermissionRescueGuide();
                 return;
             }
             
+            // Ask permission to the device browser cleanly matching strict execution constraints
             Notification.requestPermission().then(permission => {
                 if (permission === "granted") {
                     startAutomatedAlerts();
@@ -1510,34 +1492,26 @@ if (toggleAutoAlertsBtn) {
     };
 }
 
-// ✨ NEW: Tells the user exactly how to break out of the browser's "Denied" jail
 function issuePermissionRescueGuide() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    
     let rescueMsg = "⚠️ ALERTS BLOCKED: Your browser is blocking LIGTAS notifications. ";
     
     if (isIOS) {
-        rescueMsg += "On iPhones, you must tap 'Share' [↑], select 'Add to Home Screen', and open the LIGTAS app from your home screen to enable alerts.";
+        rescueMsg += "On iPhones, you must tap 'Share' [↑], select 'Add to Home Screen', and launch LIGTAS directly from your home screen to allow alerts.";
     } else {
-        rescueMsg += "To fix: Click the 'Padlock' icon next to the URL address bar above, change 'Notifications' to ALLOW, and refresh this page.";
+        rescueMsg += "To resolve: Click the 'Site Info' icon (the two small slider switches) directly to the left of the URL address bar above, toggle Notifications to ALLOW, and refresh.";
     }
-    
     showError(rescueMsg, "error");
+    if(toggleAutoAlertsBtn) toggleAutoAlertsBtn.innerText = "⚠️ Alerts Blocked";
 }
 
 function startAutomatedAlerts() {
     isWatchingAlerts = true;
     toggleAutoAlertsBtn.innerText = "🔕 Disable Track Alerts";
     toggleAutoAlertsBtn.classList.add('btn-active');
-    showError("Automated location tracking enabled. Monitoring active 20km station buffers...", "warning");
+    showError("Automated tracking active. Monitoring nearest AWS 20km baseline thresholds...", "warning");
     
-    // Initialize continuous high-accuracy hardware position monitoring
-    map.locate({
-        watch: true, 
-        setView: false, 
-        enableHighAccuracy: true, 
-        timeout: 20000
-    });
+    map.locate({ watch: true, setView: false, enableHighAccuracy: true, timeout: 20000 });
 }
 
 function stopAutomatedAlerts() {
@@ -1547,21 +1521,17 @@ function stopAutomatedAlerts() {
     toggleAutoAlertsBtn.innerText = "🔔 Enable Track Alerts";
     toggleAutoAlertsBtn.classList.remove('btn-active');
     
-    // Kill the heavy hardware GPS polling cycle
     map.stopLocate();
     showError("Automated tracking alerts successfully disabled.", "warning");
 }
 
 function checkAndTriggerMobileNotification(station) {
-    // If user is outside a 20km radius of any station, findPriorityStationNearby returns null
     if (!station) return;
     
     const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
     const stationId = station.StationName || station.Station || "Unknown AWS";
     
-    // Trigger notification if an active warning threshold (Level 1, 2, or 3) is violated
     if (level >= 1) {
-        // Anti-spam condition: block alerts if the station and threat level haven't altered since the last poll
         if (lastNotifiedStation === stationId && lastNotifiedLevel === level) return;
         
         lastNotifiedStation = stationId;
@@ -1574,13 +1544,12 @@ function checkAndTriggerMobileNotification(station) {
             new Notification(title, {
                 body: body,
                 icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
-                vibrate: [300, 100, 300, 100, 400], // Native mobile vibration array patterns
+                vibrate: [300, 100, 300, 100, 400],
                 tag: 'ligtas-weather-alert',
                 renotify: true
             });
         }
     } else {
-        // If a previously threatened region falls back to safety (Level 0), dispatch a resolution update
         if (lastNotifiedStation === stationId && lastNotifiedLevel > 0) {
             lastNotifiedLevel = 0;
             if (Notification.permission === "granted") {
