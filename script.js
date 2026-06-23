@@ -1526,35 +1526,40 @@ function stopAutomatedAlerts() {
 }
 
 function checkAndTriggerMobileNotification(station) {
+    // If user is outside the strict 20km radius loop, station returns null
     if (!station) return;
     
     const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
     const stationId = station.StationName || station.Station || "Unknown AWS";
+    const recommendation = station.Recommendedactions || "Continue regular observation and local tracking.";
     
     if (level >= 1) {
+        // Anti-spam confirmation check
         if (lastNotifiedStation === stationId && lastNotifiedLevel === level) return;
         
         lastNotifiedStation = stationId;
         lastNotifiedLevel = level;
         
-        const title = `⚠️ LIGTAS-AGAD ALERT: LEVEL ${level}`;
-        const body = `Station: ${stationId} (${station.distance} km away)\nScenario: ${station.Possiblescenario || 'N/A'}\nAction: ${station.Recommendedactions || 'Monitor updates.'}`;
+        // Structured Title and Body layout explicitly focusing on Level and Recommendations
+        const title = `⚠️ AWS ALERT: Warning Level ${level}`;
+        const body = `Nearest AWS: ${stationId} (${station.distance} km away)\n\nRecommendation:\n${recommendation}`;
         
         if (Notification.permission === "granted") {
             new Notification(title, {
                 body: body,
                 icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
-                vibrate: [300, 100, 300, 100, 400],
+                vibrate: [300, 100, 300, 100, 400], // Mobile structural hardware haptic loop
                 tag: 'ligtas-weather-alert',
                 renotify: true
             });
         }
     } else {
+        // Handle resolution notification if an active threat baseline returns to safety parameters
         if (lastNotifiedStation === stationId && lastNotifiedLevel > 0) {
             lastNotifiedLevel = 0;
             if (Notification.permission === "granted") {
-                new Notification("✅ Area Status: Normal", {
-                    body: `Your nearest monitoring station (${stationId}) has dropped back to clear safety parameters. No active threat.`,
+                new Notification("✅ Nearest AWS Status: No Warning (N/W)", {
+                    body: `Monitoring station (${stationId}) has dropped back down to clear safety baselines.\n\nRecommendation:\n${recommendation}`,
                     icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
                     tag: 'ligtas-weather-alert'
                 });
