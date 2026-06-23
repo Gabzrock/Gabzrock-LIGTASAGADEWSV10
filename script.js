@@ -261,16 +261,25 @@ try {
         });
     }
 
-    map.on('locationfound', function(e) {
-        hideLoadingScreen(); 
-        const latlng = e.latlng;
-        const priorityStation = findPriorityStationNearby(latlng, 20); 
-        const lsCount = getNearbyLandslideCount(latlng, 5); 
-        const userProperties = { "Location Type": "User Current Location", "Latitude": latlng.lat.toFixed(5), "Longitude": latlng.lng.toFixed(5) };
-        const reportContent = generateCombinedReport("User Location", userProperties, priorityStation, lsCount);
+// --- Updated Map Location Found Event (Handles both Manual Assessment and Background Tracking) ---
+map.on('locationfound', function(e) {
+    hideLoadingScreen(); 
+    const latlng = e.latlng;
+    const priorityStation = findPriorityStationNearby(latlng, 20); 
+    const lsCount = getNearbyLandslideCount(latlng, 5); 
+    const userProperties = { "Location Type": "User Current Location", "Latitude": latlng.lat.toFixed(5), "Longitude": latlng.lng.toFixed(5) };
+    const reportContent = generateCombinedReport("User Location", userProperties, priorityStation, lsCount);
+    
+    // Check if the system is currently running background automation tracking
+    if (typeof isWatchingAlerts !== 'undefined' && isWatchingAlerts) {
+        // Direct payload straight to mobile phone background engine
+        checkAndTriggerMobileNotification(priorityStation);
+    } else {
+        // Standard behavior: Trigger on-screen interactive map popups
         L.popup().setLatLng(latlng).setContent(reportContent).openOn(map);
         updatePropertiesTable("User Location", userProperties);
-    });
+    }
+});
     
     map.on('locationerror', function(e) { hideLoadingScreen(); showError("Could not acquire GPS location. Check permissions.", 'warning'); });
     
@@ -1463,4 +1472,124 @@ if (scrollRightBtn) {
     scrollRightBtn.addEventListener('click', () => {
         subheaderMenuScroll.scrollBy({ left: 200, behavior: 'smooth' });
     });
+}
+// =========================================================
+// 14. AUTOMATED LOCATION-BASED MOBILE NOTIFICATION SYSTEM
+// =========================================================
+let isWatchingAlerts = false;
+let lastNotifiedStation = "";
+let lastNotifiedLevel = -1;
+
+const toggleAutoAlertsBtn = document.getElementById('toggleAutoAlertsBtn');
+
+if (toggleAutoAlertsBtn) {
+    toggleAutoAlertsBtn.onclick = function() {
+        if (!isWatchingAlerts) {
+            
+            if (!("Notification" in window)) {
+                showError("Your browser does not support native mobile push alerts.", "warning");
+                return;
+            }
+            
+            // Check if they are already hard-locked out
+            if (Notification.permission === "denied") {
+                issuePermissionRescueGuide();
+                return;
+            }
+            
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    startAutomatedAlerts();
+                } else {
+                    issuePermissionRescueGuide();
+                }
+            });
+        } else {
+            stopAutomatedAlerts();
+        }
+    };
+}
+
+// ✨ NEW: Tells the user exactly how to break out of the browser's "Denied" jail
+function issuePermissionRescueGuide() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    
+    let rescueMsg = "⚠️ ALERTS BLOCKED: Your browser is blocking LIGTAS notifications. ";
+    
+    if (isIOS) {
+        rescueMsg += "On iPhones, you must tap 'Share' [↑], select 'Add to Home Screen', and open the LIGTAS app from your home screen to enable alerts.";
+    } else {
+        rescueMsg += "To fix: Click the 'Padlock' icon next to the URL address bar above, change 'Notifications' to ALLOW, and refresh this page.";
+    }
+    
+    showError(rescueMsg, "error");
+}
+
+function startAutomatedAlerts() {
+    isWatchingAlerts = true;
+    toggleAutoAlertsBtn.innerText = "🔕 Disable Track Alerts";
+    toggleAutoAlertsBtn.classList.add('btn-active');
+    showError("Automated location tracking enabled. Monitoring active 20km station buffers...", "warning");
+    
+    // Initialize continuous high-accuracy hardware position monitoring
+    map.locate({
+        watch: true, 
+        setView: false, 
+        enableHighAccuracy: true, 
+        timeout: 20000
+    });
+}
+
+function stopAutomatedAlerts() {
+    isWatchingAlerts = false;
+    lastNotifiedStation = "";
+    lastNotifiedLevel = -1;
+    toggleAutoAlertsBtn.innerText = "🔔 Enable Track Alerts";
+    toggleAutoAlertsBtn.classList.remove('btn-active');
+    
+    // Kill the heavy hardware GPS polling cycle
+    map.stopLocate();
+    showError("Automated tracking alerts successfully disabled.", "warning");
+}
+
+function checkAndTriggerMobileNotification(station) {
+    // If user is outside a 20km radius of any station, findPriorityStationNearby returns null
+    if (!station) return;
+    
+    const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
+    const stationId = station.StationName || station.Station || "Unknown AWS";
+    
+    // Trigger notification if an active warning threshold (Level 1, 2, or 3) is violated
+    if (level >= 1) {
+        // Anti-spam condition: block alerts if the station and threat level haven't altered since the last poll
+        if (lastNotifiedStation === stationId && lastNotifiedLevel === level) return;
+        
+        lastNotifiedStation = stationId;
+        lastNotifiedLevel = level;
+        
+        const title = `⚠️ LIGTAS-AGAD ALERT: LEVEL ${level}`;
+        const body = `Station: ${stationId} (${station.distance} km away)\nScenario: ${station.Possiblescenario || 'N/A'}\nAction: ${station.Recommendedactions || 'Monitor updates.'}`;
+        
+        if (Notification.permission === "granted") {
+            new Notification(title, {
+                body: body,
+                icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
+                vibrate: [300, 100, 300, 100, 400], // Native mobile vibration array patterns
+                tag: 'ligtas-weather-alert',
+                renotify: true
+            });
+        }
+    } else {
+        // If a previously threatened region falls back to safety (Level 0), dispatch a resolution update
+        if (lastNotifiedStation === stationId && lastNotifiedLevel > 0) {
+            lastNotifiedLevel = 0;
+            if (Notification.permission === "granted") {
+                new Notification("✅ Area Status: Normal", {
+                    body: `Your nearest monitoring station (${stationId}) has dropped back to clear safety parameters. No active threat.`,
+                    icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
+                    tag: 'ligtas-weather-alert'
+                });
+            }
+        }
+    }
 }
