@@ -1079,252 +1079,6 @@ if (defaultLayersBtn) {
 }
 
 // ==========================================
-// AWS ADVISORIES MODAL LOGIC (TABLE & PDF)
-// ==========================================
-const awsAdvisoriesModal = document.getElementById('awsAdvisoriesModal');
-const openAwsAdvisoriesBtn = document.getElementById('openAwsAdvisoriesBtn');
-const closeAwsAdvisoriesBtn = document.getElementById('closeAwsAdvisoriesBtn');
-const downloadAwsAdvisoriesPdfBtn = document.getElementById('downloadAwsAdvisoriesPdfBtn');
-
-if (openAwsAdvisoriesBtn) {
-    openAwsAdvisoriesBtn.onclick = () => {
-        awsAdvisoriesModal.style.display = "flex";
-        renderAwsAdvisoriesTable();
-    };
-}
-
-if (closeAwsAdvisoriesBtn) {
-    closeAwsAdvisoriesBtn.onclick = () => { 
-        awsAdvisoriesModal.style.display = "none"; 
-    };
-}
-
-window.addEventListener('click', (e) => {
-    if (e.target === awsAdvisoriesModal) {
-        awsAdvisoriesModal.style.display = "none";
-    }
-});
-
-function renderAwsAdvisoriesTable() {
-    const tbody = document.getElementById('awsAdvisoriesTableBody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-
-    if (!cachedAWSData || cachedAWSData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">No AWS Data Available at this moment.</td></tr>';
-        return;
-    }
-
-    // Sort by highest warning level first
-    const sortedData = [...cachedAWSData].sort((a, b) => {
-        const levelA = parseInt(a.RainfallLandslidethresholdwarninglevel) || 0;
-        const levelB = parseInt(b.RainfallLandslidethresholdwarninglevel) || 0;
-        return levelB - levelA; 
-    });
-
-    const fragment = document.createDocumentFragment();
-
-    sortedData.forEach(station => {
-        const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
-        let bgColor;
-        let textColor;
-        let levelText;
-
-        // Synchronize colors based on current AWS Warning Level
-        if (level === 1) { 
-            bgColor = '#f1c40f'; // Yellow
-            textColor = '#333'; 
-            levelText = 'Level 1 (Warning)'; 
-        } else if (level === 2) { 
-            bgColor = '#e67e22'; // Orange
-            textColor = '#fff'; 
-            levelText = 'Level 2 (Alert)'; 
-        } else if (level === 3) { 
-            bgColor = '#e74c3c'; // Red
-            textColor = '#fff'; 
-            levelText = 'Level 3 (Evacuate)'; 
-        } else { 
-            bgColor = 'transparent';         // Revised to transparent
-            textColor = 'inherit';           // Inherits theme text color safely
-            levelText = 'No Warning (N/W)';  // Revised label
-        }
-
-        const name = station.StationName || station.Station || 'Unknown';
-        const rain = station.Rainfall || station.R24H || '0';
-        const area = station.Daterange || station.Municipality || station.LocationDetails || 'N/A';
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><strong>${name}</strong></td>
-            <td>${area} <br><span style="font-size: 0.75rem; color: #888;">(20km Coverage Zone)</span></td>
-            <td>${rain} mm</td>
-            <td style="background-color: ${bgColor}; color: ${textColor}; text-align: center; font-weight: bold; vertical-align: middle;">
-                ${levelText}
-            </td>
-        `;
-        fragment.appendChild(tr);
-    });
-
-    tbody.appendChild(fragment);
-}
-
-// PDF Download Logic specifically for the Table
-// =========================================================
-// UPGRADED PDF DOWNLOAD LOGIC (COMPLETE DATA & PAGINATION)
-// =========================================================
-if (downloadAwsAdvisoriesPdfBtn) {
-    downloadAwsAdvisoriesPdfBtn.onclick = function() {
-        const originalBtnText = this.innerText;
-        this.innerText = "Generating Complete PDF Report... ⏳";
-        this.disabled = true;
-
-        // 1. Create an off-screen container for the comprehensive master report
-        const printContainer = document.createElement('div');
-        printContainer.style.padding = '20px';
-        printContainer.style.fontFamily = 'Helvetica, Arial, sans-serif';
-        printContainer.style.color = '#333';
-
-        // Current Timestamp
-        const now = new Date();
-        const timeStr = now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-        // 2. Compile complete table rows from all available dataset properties
-        let rowsHtml = '';
-        const sortedData = [...(cachedAWSData || [])].sort((a, b) => {
-            const levelA = parseInt(a.RainfallLandslidethresholdwarninglevel) || 0;
-            const levelB = parseInt(b.RainfallLandslidethresholdwarninglevel) || 0;
-            return levelB - levelA; 
-        });
-
-        sortedData.forEach(station => {
-            const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
-            let bgColor = 'transparent';
-            let textColor = '#333';
-            let levelText = 'No Warning (N/W)';
-
-            if (level === 1) { 
-                bgColor = '#f1c40f'; textColor = '#333'; levelText = 'Level 1 (Warning)'; 
-            } else if (level === 2) { 
-                bgColor = '#e67e22'; textColor = '#fff'; levelText = 'Level 2 (Alert)'; 
-            } else if (level === 3) { 
-                bgColor = '#e74c3c'; textColor = '#fff'; levelText = 'Level 3 (Evacuate)'; 
-            }
-
-            // Extract all AWS payload properties safely
-            const name = station.StationName || station.Station || 'Unknown';
-            const status = station.Status || 'Active';
-            const area = station.Daterange || station.Municipality || station.LocationDetails || 'N/A';
-            const lat = station.Latitude || 'N/A';
-            const lng = station.Longitude || 'N/A';
-            const elev = station.Elevation ? station.Elevation + ' m' : 'N/A';
-            const rain = station.Rainfall || station.R24H || '0';
-            const desc = station.Rainfalldescription || 'Normal rainfall conditions';
-            const scenario = station.Possiblescenario || 'No immediate landslide threat detected';
-            const actions = station.Recommendedactions || 'Continue regular monitoring';
-
-            // Notice: page-break-inside: avoid guarantees rows never split between pages
-            rowsHtml += `
-                <tr style="page-break-inside: avoid;">
-                    <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; vertical-align: top;">
-                        ${name}<br><span style="font-size:0.75rem; color:#666; font-weight:normal;">(${status})</span>
-                    </td>
-                    <td style="padding: 10px 8px; border: 1px solid #ddd; vertical-align: top;">${area}</td>
-                    <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;">
-                        Lat: ${lat}<br>Lng: ${lng}<br>Elev: ${elev}
-                    </td>
-                    <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; vertical-align: top;">${rain} mm</td>
-                    <td style="padding: 10px 8px; border: 1px solid #ddd; background-color: ${bgColor}; color: ${textColor}; text-align: center; font-weight: bold; vertical-align: top;">
-                        ${levelText}
-                    </td>
-                    <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;">
-                        <strong>Desc:</strong> ${desc}<br style="margin-bottom:4px;">
-                        <strong>Scenario:</strong> ${scenario}
-                    </td>
-                    <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;">${actions}</td>
-                </tr>
-            `;
-        });
-
-        // 3. Assemble Master Template with Header, Table, and Exact Project Credits
-        printContainer.innerHTML = `
-            <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #008080; padding-bottom: 10px;">
-                <h2 style="color: #008080; margin: 0; font-size: 1.6rem; text-transform: uppercase;">LIGTAS-AGAD RILEWS</h2>
-                <h3 style="margin: 5px 0 0 0; color: #444; font-size: 1.2rem;">Complete AWS Station Landslide Advisories & Master Report</h3>
-                <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #666;">Report Generated as of: ${timeStr}</p>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 30px;">
-                <thead>
-                    <tr style="background-color: #f4f4f4; color: #1a3b42; text-align: left;">
-                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%;">Station / Status</th>
-                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%;">Covered Area</th>
-                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 14%;">Coordinates & Elev</th>
-                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 10%; text-align: center;">Rainfall</th>
-                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%; text-align: center;">Warning Level</th>
-                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 22%;">Description & Scenario</th>
-                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 18%;">Recommended Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rowsHtml || '<tr><td colspan="7" style="text-align:center; padding:20px;">No station data available</td></tr>'}
-                </tbody>
-            </table>
-
-            <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #aaa; text-align: center; font-size: 0.9rem; color: #333; page-break-inside: avoid;">
-                <p style="margin: 0; font-weight: bold;">
-                    This report is generated by LIGTAS-AGAD RILEWS DOST project Funded, implemented by UPLB-SESAM
-                </p>
-            </div>
-        `;
-
-        // 4. Configure html2pdf engine with automatic pagination rules
-        const opt = { 
-            margin: [15, 10, 15, 10], // Top, Left, Bottom, Right margins in mm
-            filename: 'LIGTAS_Complete_AWS_Advisories_Report.pdf', 
-            image: { type: 'jpeg', quality: 0.98 }, 
-            html2canvas: { scale: 2, useCORS: true }, 
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }, // Strictly enforces clean page breaks
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape fits all 7 rich data columns perfectly
-        };
-
-        html2pdf().from(printContainer).set(opt).save()
-            .then(() => { 
-                this.innerText = originalBtnText; 
-                this.disabled = false; 
-            })
-            .catch(err => { 
-                console.error("PDF Export Error:", err); 
-                showError("Failed to generate complete PDF report.", 'warning'); 
-                this.innerText = "Retry PDF"; 
-                this.disabled = false; 
-            });
-    };
-}
-
-// --- 10. Hamburger Menu Logic ---
-const hamburgerBtn = document.getElementById('hamburgerBtn');
-const subheaderMenu = document.getElementById('subheader');
-
-if (hamburgerBtn && subheaderMenu) {
-    hamburgerBtn.addEventListener('click', function(e) {
-        e.preventDefault(); e.stopPropagation(); 
-        if (subheaderMenu.classList.contains('show-menu')) { subheaderMenu.classList.remove('show-menu'); } 
-        else { subheaderMenu.classList.add('show-menu'); }
-    });
-
-    const navButtons = subheaderMenu.querySelectorAll('.nav-btn');
-    navButtons.forEach(btn => { btn.addEventListener('click', () => { subheaderMenu.classList.remove('show-menu'); }); });
-
-    document.addEventListener('click', function(e) {
-        if (subheaderMenu.classList.contains('show-menu')) {
-            if (!subheaderMenu.contains(e.target) && e.target !== hamburgerBtn) { subheaderMenu.classList.remove('show-menu'); }
-        }
-    });
-
-    if (typeof map !== 'undefined') { map.on('click dragstart zoomstart', function() { subheaderMenu.classList.remove('show-menu'); }); }
-}
-
-// ==========================================
 // 11. ALL STATIONS RAINFALL GRAPH (CHART.JS)
 // ==========================================
 
@@ -1333,10 +1087,12 @@ const allStationsGraphModal = document.getElementById('allStationsGraphModal');
 const closeAllStationsGraphBtn = document.getElementById('closeAllStationsGraphBtn');
 const openAllStationsGraphBtn = document.getElementById('openAllStationsGraphBtn');
 const downloadGraphBtn = document.getElementById('downloadGraphBtn');
+const graphCategoryFilter = document.getElementById('graphCategoryFilter'); // ✨ New Filter
 
 if (openAllStationsGraphBtn) {
     openAllStationsGraphBtn.onclick = () => {
         allStationsGraphModal.style.display = "flex";
+        populateGraphCategoryDropdown(); // Build dropdown options
         renderAllStationsGraph();
     };
 }
@@ -1349,31 +1105,38 @@ window.addEventListener('click', (e) => {
     if (e.target === allStationsGraphModal) allStationsGraphModal.style.display = "none";
 });
 
-if (downloadGraphBtn) {
-    downloadGraphBtn.onclick = () => {
-        const canvas = document.getElementById('allStationsChart');
-        if (canvas) {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
-            const ctx = tempCanvas.getContext('2d');
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-            ctx.drawImage(canvas, 0, 0);
-            
-            const link = document.createElement('a');
-            link.download = 'LIGTAS-Rainfall-Graph.png';
-            link.href = tempCanvas.toDataURL('image/png');
-            link.click();
-        }
-    };
+// Re-render chart when dropdown changes
+if (graphCategoryFilter) {
+    graphCategoryFilter.addEventListener('change', renderAllStationsGraph);
 }
 
+// Automatically build dropdown options based on fetched Data
+function populateGraphCategoryDropdown() {
+    if (!graphCategoryFilter || !cachedAWSData) return;
+    
+    const currentSelection = graphCategoryFilter.value;
+    const categories = new Set();
+    
+    cachedAWSData.forEach(station => {
+        const cat = station.Site_Category && station.Site_Category.trim() !== '' ? station.Site_Category : 'Uncategorized';
+        categories.add(cat);
+    });
+
+    let optionsHtml = '<option value="All">All Regions</option>';
+    Array.from(categories).sort().forEach(cat => {
+        optionsHtml += `<option value="${cat}">${cat}</option>`;
+    });
+
+    graphCategoryFilter.innerHTML = optionsHtml;
+    if (Array.from(categories).includes(currentSelection)) {
+        graphCategoryFilter.value = currentSelection; // Retain selection on data refresh
+    }
+}
+
+// Render Graph logic (Includes Filter)
 function renderAllStationsGraph() {
     const ctx = document.getElementById('allStationsChart').getContext('2d');
     const countSpan = document.getElementById('awsTotalCount');
-
     const isDark = document.body.classList.contains('dark-mode');
     const textColor = isDark ? '#e0e0e0' : '#666';
     const gridColor = isDark ? '#444' : 'rgba(0,0,0,0.1)';
@@ -1381,11 +1144,23 @@ function renderAllStationsGraph() {
     const labels = [];
     const dataValues = [];
     const backgroundColors = [];
+    
+    const selectedCategory = graphCategoryFilter ? graphCategoryFilter.value : 'All';
 
     if (cachedAWSData && cachedAWSData.length > 0) {
-        if (countSpan) countSpan.innerText = cachedAWSData.length;
+        // Filter by Site_Category
+        let filteredData = cachedAWSData;
+        if (selectedCategory !== 'All') {
+            filteredData = cachedAWSData.filter(station => {
+                const cat = station.Site_Category && station.Site_Category.trim() !== '' ? station.Site_Category : 'Uncategorized';
+                return cat === selectedCategory;
+            });
+        }
 
-        const sortedData = [...cachedAWSData].sort((a, b) => {
+        if (countSpan) countSpan.innerText = filteredData.length;
+
+        // Sort Highest Rainfall First
+        const sortedData = [...filteredData].sort((a, b) => {
             const rainA = parseFloat(a.Rainfall || a.R24H || 0);
             const rainB = parseFloat(b.Rainfall || b.R24H || 0);
             return rainB - rainA;
@@ -1440,6 +1215,7 @@ function renderAllStationsGraph() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            // ... (Rest of your existing Chart options remain unchanged)
             onClick: (event, activeElements) => {
                 if (activeElements.length > 0) {
                     const dataIndex = activeElements[0].index;
@@ -1452,14 +1228,6 @@ function renderAllStationsGraph() {
                         if (!isNaN(lat) && !isNaN(lng)) {
                             document.getElementById('allStationsGraphModal').style.display = "none";
                             map.flyTo([lat, lng], 14, { duration: 1.5 });
-                            warningLayerGroup.eachLayer(layer => {
-                                if (layer instanceof L.Marker) {
-                                    const popup = layer.getPopup();
-                                    if (popup && popup.getContent().includes(clickedStationName)) {
-                                        setTimeout(() => { layer.openPopup(); updatePropertiesTable("AWS Station", station); }, 500); 
-                                    }
-                                }
-                            });
                         }
                     }
                 }
@@ -1474,6 +1242,236 @@ function renderAllStationsGraph() {
     });
 }
 
+// Download Button Logic
+if (downloadGraphBtn) {
+    downloadGraphBtn.onclick = () => {
+        const canvas = document.getElementById('allStationsChart');
+        if (canvas) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const ctx = tempCanvas.getContext('2d');
+            
+            ctx.fillStyle = document.body.classList.contains('dark-mode') ? '#121212' : '#ffffff';
+            ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            ctx.drawImage(canvas, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = `LIGTAS_Rainfall_Graph_${graphCategoryFilter.value}.png`;
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+        }
+    };
+}
+// ==========================================
+// AWS ADVISORIES MODAL LOGIC (GROUPED BY REGION)
+// ==========================================
+const awsAdvisoriesModal = document.getElementById('awsAdvisoriesModal');
+const openAwsAdvisoriesBtn = document.getElementById('openAwsAdvisoriesBtn');
+const closeAwsAdvisoriesBtn = document.getElementById('closeAwsAdvisoriesBtn');
+const downloadAwsAdvisoriesPdfBtn = document.getElementById('downloadAwsAdvisoriesPdfBtn');
+
+if (openAwsAdvisoriesBtn) {
+    openAwsAdvisoriesBtn.onclick = () => {
+        awsAdvisoriesModal.style.display = "flex";
+        renderAwsAdvisoriesTable();
+    };
+}
+
+if (closeAwsAdvisoriesBtn) { closeAwsAdvisoriesBtn.onclick = () => awsAdvisoriesModal.style.display = "none"; }
+window.addEventListener('click', (e) => { if (e.target === awsAdvisoriesModal) awsAdvisoriesModal.style.display = "none"; });
+
+function renderAwsAdvisoriesTable() {
+    const tbody = document.getElementById('awsAdvisoriesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!cachedAWSData || cachedAWSData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">No AWS Data Available at this moment.</td></tr>';
+        return;
+    }
+
+    // ✨ Group Data by Site_Category
+    const groupedData = cachedAWSData.reduce((acc, station) => {
+        const cat = station.Site_Category && station.Site_Category.trim() !== '' ? station.Site_Category : 'Uncategorized';
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(station);
+        return acc;
+    }, {});
+
+    const fragment = document.createDocumentFragment();
+
+    // Iterate over Regions Alphabetically
+    Object.keys(groupedData).sort().forEach(category => {
+        
+        // Render Group Header Row
+        const headerTr = document.createElement('tr');
+        headerTr.innerHTML = `
+            <td colspan="4" style="background-color: var(--dark-teal); color: #FFD700; font-weight: bold; padding: 8px 12px; letter-spacing: 1px; text-transform: uppercase;">
+                Region: ${category}
+            </td>
+        `;
+        fragment.appendChild(headerTr);
+
+        // Sort specific region's stations by warning level
+        const sortedGroup = groupedData[category].sort((a, b) => {
+            const levelA = parseInt(a.RainfallLandslidethresholdwarninglevel) || 0;
+            const levelB = parseInt(b.RainfallLandslidethresholdwarninglevel) || 0;
+            return levelB - levelA; 
+        });
+
+        sortedGroup.forEach(station => {
+            const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
+            let bgColor = 'transparent'; let textColor = 'inherit'; let levelText = 'No Warning (N/W)';
+
+            if (level === 1) { bgColor = '#f1c40f'; textColor = '#333'; levelText = 'Level 1 (Warning)'; } 
+            else if (level === 2) { bgColor = '#e67e22'; textColor = '#fff'; levelText = 'Level 2 (Alert)'; } 
+            else if (level === 3) { bgColor = '#e74c3c'; textColor = '#fff'; levelText = 'Level 3 (Evacuate)'; }
+
+            const name = station.StationName || station.Station || 'Unknown';
+            const rain = station.Rainfall || station.R24H || '0';
+            const area = station.Daterange || station.Municipality || station.LocationDetails || 'N/A';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${name}</strong></td>
+                <td>${area} <br><span style="font-size: 0.75rem; color: #888;">(20km Coverage Zone)</span></td>
+                <td>${rain} mm</td>
+                <td style="background-color: ${bgColor}; color: ${textColor}; text-align: center; font-weight: bold; vertical-align: middle;">
+                    ${levelText}
+                </td>
+            `;
+            fragment.appendChild(tr);
+        });
+    });
+
+    tbody.appendChild(fragment);
+}
+
+// =========================================================
+// UPGRADED PDF DOWNLOAD LOGIC (GROUPED BY REGION)
+// =========================================================
+if (downloadAwsAdvisoriesPdfBtn) {
+    downloadAwsAdvisoriesPdfBtn.onclick = function() {
+        const originalBtnText = this.innerText;
+        this.innerText = "Generating Complete PDF Report... ⏳";
+        this.disabled = true;
+
+        const printContainer = document.createElement('div');
+        printContainer.style.padding = '20px';
+        printContainer.style.fontFamily = 'Helvetica, Arial, sans-serif';
+        printContainer.style.color = '#333';
+
+        const now = new Date();
+        const timeStr = now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        let rowsHtml = '';
+        
+        // Group Data by Site_Category for the PDF
+        const groupedData = (cachedAWSData || []).reduce((acc, station) => {
+            const cat = station.Site_Category && station.Site_Category.trim() !== '' ? station.Site_Category : 'Uncategorized';
+            if (!acc[cat]) acc[cat] = [];
+            acc[cat].push(station);
+            return acc;
+        }, {});
+
+        Object.keys(groupedData).sort().forEach(category => {
+            
+            // Add Category Division Header to PDF
+            rowsHtml += `
+                <tr style="background-color: #1a3b42; color: #FFD700; page-break-after: avoid;">
+                    <td colspan="7" style="padding: 10px; font-weight: bold; font-size: 1rem; text-transform: uppercase;">
+                        REGION: ${category}
+                    </td>
+                </tr>
+            `;
+
+            const sortedGroup = groupedData[category].sort((a, b) => {
+                const levelA = parseInt(a.RainfallLandslidethresholdwarninglevel) || 0;
+                const levelB = parseInt(b.RainfallLandslidethresholdwarninglevel) || 0;
+                return levelB - levelA; 
+            });
+
+            sortedGroup.forEach(station => {
+                const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
+                let bgColor = 'transparent'; let textColor = '#333'; let levelText = 'No Warning (N/W)';
+
+                if (level === 1) { bgColor = '#f1c40f'; textColor = '#333'; levelText = 'Level 1 (Warning)'; } 
+                else if (level === 2) { bgColor = '#e67e22'; textColor = '#fff'; levelText = 'Level 2 (Alert)'; } 
+                else if (level === 3) { bgColor = '#e74c3c'; textColor = '#fff'; levelText = 'Level 3 (Evacuate)'; }
+
+                const name = station.StationName || station.Station || 'Unknown';
+                const status = station.Status || 'Active';
+                const area = station.Daterange || station.Municipality || station.LocationDetails || 'N/A';
+                const lat = station.Latitude || 'N/A';
+                const lng = station.Longitude || 'N/A';
+                const elev = station.Elevation ? station.Elevation + ' m' : 'N/A';
+                const rain = station.Rainfall || station.R24H || '0';
+                const desc = station.Rainfalldescription || 'Normal rainfall conditions';
+                const scenario = station.Possiblescenario || 'No immediate landslide threat detected';
+                const actions = station.Recommendedactions || 'Continue regular monitoring';
+
+                rowsHtml += `
+                    <tr style="page-break-inside: avoid;">
+                        <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; vertical-align: top;">
+                            ${name}<br><span style="font-size:0.75rem; color:#666; font-weight:normal;">(${status})</span>
+                        </td>
+                        <td style="padding: 10px 8px; border: 1px solid #ddd; vertical-align: top;">${area}</td>
+                        <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;">Lat: ${lat}<br>Lng: ${lng}<br>Elev: ${elev}</td>
+                        <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; vertical-align: top;">${rain} mm</td>
+                        <td style="padding: 10px 8px; border: 1px solid #ddd; background-color: ${bgColor}; color: ${textColor}; text-align: center; font-weight: bold; vertical-align: top;">${levelText}</td>
+                        <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;"><strong>Desc:</strong> ${desc}<br style="margin-bottom:4px;"><strong>Scenario:</strong> ${scenario}</td>
+                        <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;">${actions}</td>
+                    </tr>
+                `;
+            });
+        });
+
+        printContainer.innerHTML = `
+            <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #008080; padding-bottom: 10px;">
+                <h2 style="color: #008080; margin: 0; font-size: 1.6rem; text-transform: uppercase;">LIGTAS-AGAD RILEWS</h2>
+                <h3 style="margin: 5px 0 0 0; color: #444; font-size: 1.2rem;">Regional AWS Station Landslide Advisories & Master Report</h3>
+                <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #666;">Report Generated as of: ${timeStr}</p>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 30px;">
+                <thead>
+                    <tr style="background-color: #f4f4f4; color: #1a3b42; text-align: left;">
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%;">Station / Status</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%;">Covered Area</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 14%;">Coordinates & Elev</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 10%; text-align: center;">Rainfall</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%; text-align: center;">Warning Level</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 22%;">Description & Scenario</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 18%;">Recommended Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml || '<tr><td colspan="7" style="text-align:center; padding:20px;">No station data available</td></tr>'}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #aaa; text-align: center; font-size: 0.9rem; color: #333; page-break-inside: avoid;">
+                <p style="margin: 0; font-weight: bold;">
+                    This report is generated by LIGTAS-AGAD RILEWS DOST project Funded, implemented by SESAM
+                </p>
+            </div>
+        `;
+
+        const opt = { 
+            margin: [15, 10, 15, 10], 
+            filename: 'LIGTAS_Regional_AWS_Advisories_Report.pdf', 
+            image: { type: 'jpeg', quality: 0.98 }, 
+            html2canvas: { scale: 2, useCORS: true }, 
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }, 
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } 
+        };
+
+        html2pdf().from(printContainer).set(opt).save()
+            .then(() => { this.innerText = originalBtnText; this.disabled = false; })
+            .catch(err => { console.error("PDF Error:", err); showError("Failed to generate report.", 'warning'); this.innerText = "Retry PDF"; this.disabled = false; });
+    };
+}
 // ==========================================
 // 12. AUTOMATIC & MANUAL DARK MODE LOGIC
 // ==========================================
