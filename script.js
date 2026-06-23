@@ -1169,29 +1169,132 @@ function renderAwsAdvisoriesTable() {
 }
 
 // PDF Download Logic specifically for the Table
+// =========================================================
+// UPGRADED PDF DOWNLOAD LOGIC (COMPLETE DATA & PAGINATION)
+// =========================================================
 if (downloadAwsAdvisoriesPdfBtn) {
     downloadAwsAdvisoriesPdfBtn.onclick = function() {
-        const element = document.getElementById('awsAdvisoriesPrintArea');
         const originalBtnText = this.innerText;
-        this.innerText = "Generating PDF...";
+        this.innerText = "Generating Complete PDF Report... ⏳";
         this.disabled = true;
 
+        // 1. Create an off-screen container for the comprehensive master report
+        const printContainer = document.createElement('div');
+        printContainer.style.padding = '20px';
+        printContainer.style.fontFamily = 'Helvetica, Arial, sans-serif';
+        printContainer.style.color = '#333';
+
+        // Current Timestamp
+        const now = new Date();
+        const timeStr = now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        // 2. Compile complete table rows from all available dataset properties
+        let rowsHtml = '';
+        const sortedData = [...(cachedAWSData || [])].sort((a, b) => {
+            const levelA = parseInt(a.RainfallLandslidethresholdwarninglevel) || 0;
+            const levelB = parseInt(b.RainfallLandslidethresholdwarninglevel) || 0;
+            return levelB - levelA; 
+        });
+
+        sortedData.forEach(station => {
+            const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
+            let bgColor = 'transparent';
+            let textColor = '#333';
+            let levelText = 'No Warning (N/W)';
+
+            if (level === 1) { 
+                bgColor = '#f1c40f'; textColor = '#333'; levelText = 'Level 1 (Warning)'; 
+            } else if (level === 2) { 
+                bgColor = '#e67e22'; textColor = '#fff'; levelText = 'Level 2 (Alert)'; 
+            } else if (level === 3) { 
+                bgColor = '#e74c3c'; textColor = '#fff'; levelText = 'Level 3 (Evacuate)'; 
+            }
+
+            // Extract all AWS payload properties safely
+            const name = station.StationName || station.Station || 'Unknown';
+            const status = station.Status || 'Active';
+            const area = station.Daterange || station.Municipality || station.LocationDetails || 'N/A';
+            const lat = station.Latitude || 'N/A';
+            const lng = station.Longitude || 'N/A';
+            const elev = station.Elevation ? station.Elevation + ' m' : 'N/A';
+            const rain = station.Rainfall || station.R24H || '0';
+            const desc = station.Rainfalldescription || 'Normal rainfall conditions';
+            const scenario = station.Possiblescenario || 'No immediate landslide threat detected';
+            const actions = station.Recommendedactions || 'Continue regular monitoring';
+
+            // Notice: page-break-inside: avoid guarantees rows never split between pages
+            rowsHtml += `
+                <tr style="page-break-inside: avoid;">
+                    <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; vertical-align: top;">
+                        ${name}<br><span style="font-size:0.75rem; color:#666; font-weight:normal;">(${status})</span>
+                    </td>
+                    <td style="padding: 10px 8px; border: 1px solid #ddd; vertical-align: top;">${area}</td>
+                    <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;">
+                        Lat: ${lat}<br>Lng: ${lng}<br>Elev: ${elev}
+                    </td>
+                    <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: center; font-weight: bold; vertical-align: top;">${rain} mm</td>
+                    <td style="padding: 10px 8px; border: 1px solid #ddd; background-color: ${bgColor}; color: ${textColor}; text-align: center; font-weight: bold; vertical-align: top;">
+                        ${levelText}
+                    </td>
+                    <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;">
+                        <strong>Desc:</strong> ${desc}<br style="margin-bottom:4px;">
+                        <strong>Scenario:</strong> ${scenario}
+                    </td>
+                    <td style="padding: 10px 8px; border: 1px solid #ddd; font-size: 0.8rem; vertical-align: top;">${actions}</td>
+                </tr>
+            `;
+        });
+
+        // 3. Assemble Master Template with Header, Table, and Exact Project Credits
+        printContainer.innerHTML = `
+            <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #008080; padding-bottom: 10px;">
+                <h2 style="color: #008080; margin: 0; font-size: 1.6rem; text-transform: uppercase;">LIGTAS-AGAD RILEWS</h2>
+                <h3 style="margin: 5px 0 0 0; color: #444; font-size: 1.2rem;">Complete AWS Station Landslide Advisories & Master Report</h3>
+                <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #666;">Report Generated as of: ${timeStr}</p>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 30px;">
+                <thead>
+                    <tr style="background-color: #f4f4f4; color: #1a3b42; text-align: left;">
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%;">Station / Status</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%;">Covered Area</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 14%;">Coordinates & Elev</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 10%; text-align: center;">Rainfall</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%; text-align: center;">Warning Level</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 22%;">Description & Scenario</th>
+                        <th style="padding: 10px 8px; border: 1px solid #ddd; width: 18%;">Recommended Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHtml || '<tr><td colspan="7" style="text-align:center; padding:20px;">No station data available</td></tr>'}
+                </tbody>
+            </table>
+
+            <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #aaa; text-align: center; font-size: 0.9rem; color: #333; page-break-inside: avoid;">
+                <p style="margin: 0; font-weight: bold;">
+                    This report is generated by LIGTAS-AGAD RILEWS DOST project Funded, implemented by UPLB-SESAM
+                </p>
+            </div>
+        `;
+
+        // 4. Configure html2pdf engine with automatic pagination rules
         const opt = { 
-            margin: 10, 
-            filename: 'LIGTAS_AWS_Station_Advisories.pdf', 
+            margin: [15, 10, 15, 10], // Top, Left, Bottom, Right margins in mm
+            filename: 'LIGTAS_Complete_AWS_Advisories_Report.pdf', 
             image: { type: 'jpeg', quality: 0.98 }, 
             html2canvas: { scale: 2, useCORS: true }, 
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }, // Strictly enforces clean page breaks
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } // Landscape fits all 7 rich data columns perfectly
         };
 
-        html2pdf().from(element).set(opt).save()
+        html2pdf().from(printContainer).set(opt).save()
             .then(() => { 
                 this.innerText = originalBtnText; 
                 this.disabled = false; 
             })
             .catch(err => { 
-                console.error("PDF Error:", err); 
-                showError("Failed to generate PDF.", 'warning'); 
+                console.error("PDF Export Error:", err); 
+                showError("Failed to generate complete PDF report.", 'warning'); 
                 this.innerText = "Retry PDF"; 
                 this.disabled = false; 
             });
