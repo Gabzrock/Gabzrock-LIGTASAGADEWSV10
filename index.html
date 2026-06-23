@@ -178,25 +178,32 @@
         </div>
     </div>
 
-    <div id="allStationsGraphModal" class="ui-modal">
-        <div class="ui-modal-content" style="max-width: 800px; width: 95%;">
-            <span class="close-ui-modal" id="closeAllStationsGraphBtn">&times;</span>
-            <h3>📊 Data from all stations</h3>
-            <p style="text-align: center; font-size: 0.95rem; color: #666; margin-bottom: 10px;">
-                Current Total Rainfall (mm) | <strong><span id="awsTotalCount">0</span> Stations Online</strong>
-            </p>
-            
-            <div class="panel-content chart-scroll-wrapper" style="width: 100%; overflow-x: auto; overflow-y: hidden; border: 1px solid #eee; border-radius: 4px; padding: 10px 0;">
-                <div id="chartAreaContainer" style="height: 380px; position: relative;">
-                    <canvas id="allStationsChart"></canvas>
-                </div>
-            </div>
+<div id="allStationsGraphModal" class="ui-modal">
+    <div class="ui-modal-content" style="max-width: 800px; width: 95%;">
+        <span class="close-ui-modal" id="closeAllStationsGraphBtn">&times;</span>
+        <h3>📊 Data from all stations</h3>
+        <p style="text-align: center; font-size: 0.95rem; color: #666; margin-bottom: 10px;">
+            Current Total Rainfall (mm) | <strong><span id="awsTotalCount">0</span> Stations Online</strong>
+        </p>
 
-            <div style="text-align: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
-                <button id="downloadGraphBtn" class="nav-btn btn-success" style="padding: 8px 25px; font-size: 1rem;">⬇️ Download Graph as Image</button>
+        <div style="text-align: center; margin-bottom: 15px;">
+            <label for="graphCategoryFilter" style="font-weight: bold; margin-right: 10px; color: var(--dark-teal);">Filter Region:</label>
+            <select id="graphCategoryFilter" class="nav-btn" style="padding: 6px 15px; border-radius: 5px; font-weight: bold; border: 1px solid #ccc; background: #fff; color: #333; cursor: pointer;">
+                <option value="All">All Regions</option>
+            </select>
+        </div>
+        
+        <div class="panel-content chart-scroll-wrapper" style="width: 100%; overflow-x: auto; overflow-y: hidden; border: 1px solid #eee; border-radius: 4px; padding: 10px 0;">
+            <div id="chartAreaContainer" style="height: 380px; position: relative;">
+                <canvas id="allStationsChart"></canvas>
             </div>
         </div>
+
+        <div style="text-align: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+            <button id="downloadGraphBtn" class="nav-btn btn-success" style="padding: 8px 25px; font-size: 1rem;">⬇️ Download Graph as Image</button>
+        </div>
     </div>
+</div>
 
     <div id="imageModal" class="image-modal" onclick="this.style.display='none'">
         <span class="close-modal">&times;</span>
