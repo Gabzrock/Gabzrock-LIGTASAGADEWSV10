@@ -1078,6 +1078,126 @@ if (defaultLayersBtn) {
     });
 }
 
+// ==========================================
+// AWS ADVISORIES MODAL LOGIC (TABLE & PDF)
+// ==========================================
+const awsAdvisoriesModal = document.getElementById('awsAdvisoriesModal');
+const openAwsAdvisoriesBtn = document.getElementById('openAwsAdvisoriesBtn');
+const closeAwsAdvisoriesBtn = document.getElementById('closeAwsAdvisoriesBtn');
+const downloadAwsAdvisoriesPdfBtn = document.getElementById('downloadAwsAdvisoriesPdfBtn');
+
+if (openAwsAdvisoriesBtn) {
+    openAwsAdvisoriesBtn.onclick = () => {
+        awsAdvisoriesModal.style.display = "flex";
+        renderAwsAdvisoriesTable();
+    };
+}
+
+if (closeAwsAdvisoriesBtn) {
+    closeAwsAdvisoriesBtn.onclick = () => { 
+        awsAdvisoriesModal.style.display = "none"; 
+    };
+}
+
+window.addEventListener('click', (e) => {
+    if (e.target === awsAdvisoriesModal) {
+        awsAdvisoriesModal.style.display = "none";
+    }
+});
+
+function renderAwsAdvisoriesTable() {
+    const tbody = document.getElementById('awsAdvisoriesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!cachedAWSData || cachedAWSData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">No AWS Data Available at this moment.</td></tr>';
+        return;
+    }
+
+    // Sort by highest warning level first
+    const sortedData = [...cachedAWSData].sort((a, b) => {
+        const levelA = parseInt(a.RainfallLandslidethresholdwarninglevel) || 0;
+        const levelB = parseInt(b.RainfallLandslidethresholdwarninglevel) || 0;
+        return levelB - levelA; 
+    });
+
+    const fragment = document.createDocumentFragment();
+
+    sortedData.forEach(station => {
+        const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
+        let bgColor;
+        let textColor;
+        let levelText;
+
+        // Synchronize colors based on current AWS Warning Level
+        if (level === 1) { 
+            bgColor = '#f1c40f'; // Yellow
+            textColor = '#333'; 
+            levelText = 'Level 1 (Warning)'; 
+        } else if (level === 2) { 
+            bgColor = '#e67e22'; // Orange
+            textColor = '#fff'; 
+            levelText = 'Level 2 (Alert)'; 
+        } else if (level === 3) { 
+            bgColor = '#e74c3c'; // Red
+            textColor = '#fff'; 
+            levelText = 'Level 3 (Evacuate)'; 
+        } else { 
+            bgColor = 'transparent';         // Revised to transparent
+            textColor = 'inherit';           // Inherits theme text color safely
+            levelText = 'No Warning (N/W)';  // Revised label
+        }
+
+        const name = station.StationName || station.Station || 'Unknown';
+        const rain = station.Rainfall || station.R24H || '0';
+        const area = station.Daterange || station.Municipality || station.LocationDetails || 'N/A';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${name}</strong></td>
+            <td>${area} <br><span style="font-size: 0.75rem; color: #888;">(20km Coverage Zone)</span></td>
+            <td>${rain} mm</td>
+            <td style="background-color: ${bgColor}; color: ${textColor}; text-align: center; font-weight: bold; vertical-align: middle;">
+                ${levelText}
+            </td>
+        `;
+        fragment.appendChild(tr);
+    });
+
+    tbody.appendChild(fragment);
+}
+
+// PDF Download Logic specifically for the Table
+if (downloadAwsAdvisoriesPdfBtn) {
+    downloadAwsAdvisoriesPdfBtn.onclick = function() {
+        const element = document.getElementById('awsAdvisoriesPrintArea');
+        const originalBtnText = this.innerText;
+        this.innerText = "Generating PDF...";
+        this.disabled = true;
+
+        const opt = { 
+            margin: 10, 
+            filename: 'LIGTAS_AWS_Station_Advisories.pdf', 
+            image: { type: 'jpeg', quality: 0.98 }, 
+            html2canvas: { scale: 2, useCORS: true }, 
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+        };
+
+        html2pdf().from(element).set(opt).save()
+            .then(() => { 
+                this.innerText = originalBtnText; 
+                this.disabled = false; 
+            })
+            .catch(err => { 
+                console.error("PDF Error:", err); 
+                showError("Failed to generate PDF.", 'warning'); 
+                this.innerText = "Retry PDF"; 
+                this.disabled = false; 
+            });
+    };
+}
+
 // --- 10. Hamburger Menu Logic ---
 const hamburgerBtn = document.getElementById('hamburgerBtn');
 const subheaderMenu = document.getElementById('subheader');
