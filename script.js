@@ -613,7 +613,9 @@ function syncAwsLayersWithData() {
     });
 }
 
-// Synced Regions Initialization
+//AWS-LAYERED_SUSCEPTIBILITY_MAPS//
+
+//LIGTAS-AWS_RILEWS_MGB_SUSCEPTIBILITY_GEOJSON//
 initSynchronizedAWSLayer('LANDGRANT', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Landgrant%20AWS_RIL_HL.geojson', 'LIGTAS LANDGRANT AWS');
 initSynchronizedAWSLayer('NAC', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_NAC%20AWS_RIL_HL.geojson', 'LIGTAS NAC 2026');
 initSynchronizedAWSLayer('PGPC', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_PGPC%20AWS_RIL_HL.geojson', 'VOTE PGPC AWS');
@@ -624,6 +626,23 @@ initSynchronizedAWSLayer('COROZ', 'https://raw.githubusercontent.com/Gabzrock/LI
 initSynchronizedAWSLayer('ITOGON', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Itogon%20AWS_RIL_HL.geojson', 'LIGTAS ITOGON AWS');
 initSynchronizedAWSLayer('CATANAUAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catanauan%20AWS_RIL_HL.geojson', 'LIGTAS CATANAUAN AWS');
 initSynchronizedAWSLayer('CATARMAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catarman%20AWS_RIL_HL.geojson', 'LIGTAS UEP-CATARMAN AWS');
+
+//PAGASA-AWS_RILEWS_MGB_SUSCEPTIBILITY_GEOJSON//
+initSynchronizedAWSLayer('Los Banos, Laguna AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/UPLB%20Laguna%20AWS_RIL_HL.geojson', 'PAGASA-UP Los Banos, Laguna AWS');
+
+initSynchronizedAWSLayer('Polillio-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Polilo%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Polillio-Quezon AWS');
+
+initSynchronizedAWSLayer('Mulanay, Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Mulanay%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Mulanay, Quezon AWS');
+
+initSynchronizedAWSLayer('Pili Camarines Sur AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Pili%20Camarines%20Sur%20AWS_RIL_HL.geojson', 'PAGASA-Pili Camarines Sur AWS');
+
+initSynchronizedAWSLayer('Legazpi AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Legazpi%20Albay%20AWS_RIL_HL.geojson', 'PAGASA-Legazpi AWS');
+
+initSynchronizedAWSLayer('Northern-Samar AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Catarman%20Northern%20Samar%20AWS_RIL_HL.geojson', 'PAGASA-Northern-Samar AWS');
+
+initSynchronizedAWSLayer('Ambulong Tanauan Batangas AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Ambulong%20Tanauan%20Batangas%20AWS_RIL_HL.geojson', 'PAGASA-Ambulong Tanauan Batangas AWS');
+
+initSynchronizedAWSLayer('Lipa, Batangas AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Lipa%20Batangas%20AWS_RIL_HL.geojson', 'PAGASA-Lipa, Batangas AWS');
 
 // ==========================================
 // 6. CONTROLS INITIALIZATION
@@ -1140,7 +1159,7 @@ function renderAllStationsGraph() {
             const rain = parseFloat(station.Rainfall || station.R24H || 0);
             const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
             
-            let color = 'rgba(46, 204, 113, 0.85)'; 
+            let color = 'transparent'; 
             if (level === 1) color = 'rgba(255, 215, 0, 0.9)'; 
             if (level === 2) color = 'rgba(255, 140, 0, 0.9)'; 
             if (level === 3) color = 'rgba(231, 76, 60, 0.9)'; 
@@ -1176,7 +1195,7 @@ function renderAllStationsGraph() {
                     }
                 }
             },
-            scales: { y: { title: { display: true, text: 'Rainfall (mm)', color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } }, x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 45, color: textColor } } },
+            scales: { y: { title: { display: true, text: 'Rainfall Antecedent+Cumulative (7-days)', color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } }, x: { grid: { display: false }, ticks: { maxRotation: 45, minRotation: 45, color: textColor } } },
             plugins: { legend: { display: false } }
         }
     });
@@ -1231,7 +1250,7 @@ function renderAwsAdvisoriesTable() {
 
         sortedGroup.forEach(station => {
             const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
-            let bgColor = 'transparent'; let textColor = 'inherit'; let levelText = 'No Warning (N/W)';
+            let bgColor = 'transparent'; let textColor = 'inherit'; let levelText = 'No Warning';
             if (level === 1) { bgColor = '#f1c40f'; textColor = '#333'; levelText = 'Level 1 (Warning)'; } 
             else if (level === 2) { bgColor = '#e67e22'; textColor = '#fff'; levelText = 'Level 2 (Alert)'; } 
             else if (level === 3) { bgColor = '#e74c3c'; textColor = '#fff'; levelText = 'Level 3 (Evacuate)'; }
@@ -1296,7 +1315,7 @@ if (downloadAwsAdvisoriesPdfBtn) {
                                     <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%;">Station / Status</th>
                                     <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%;">Covered Area</th>
                                     <th style="padding: 10px 8px; border: 1px solid #ddd; width: 14%;">Coordinates & Elev</th>
-                                    <th style="padding: 10px 8px; border: 1px solid #ddd; width: 10%; text-align: center;">Rainfall</th>
+                                    <th style="padding: 10px 8px; border: 1px solid #ddd; width: 10%; text-align: center;">Rainfall Antecedent+Cumulative (7-days)</th>
                                     <th style="padding: 10px 8px; border: 1px solid #ddd; width: 12%; text-align: center;">Warning Level</th>
                                     <th style="padding: 10px 8px; border: 1px solid #ddd; width: 22%;">Description & Scenario</th>
                                     <th style="padding: 10px 8px; border: 1px solid #ddd; width: 18%;">Recommended Actions</th>
@@ -1309,7 +1328,7 @@ if (downloadAwsAdvisoriesPdfBtn) {
 
                 sortedGroup.forEach(station => {
                     const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
-                    let bgColor = 'transparent'; let textColor = '#333'; let levelText = 'No Warning (N/W)';
+                    let bgColor = 'transparent'; let textColor = '#333'; let levelText = 'No Warning';
                     if (level === 1) { bgColor = '#f1c40f'; textColor = '#333'; levelText = 'Level 1 (Warning)'; } 
                     else if (level === 2) { bgColor = '#e67e22'; textColor = '#fff'; levelText = 'Level 2 (Alert)'; } 
                     else if (level === 3) { bgColor = '#e74c3c'; textColor = '#fff'; levelText = 'Level 3 (Evacuate)'; }
@@ -1558,7 +1577,7 @@ function checkAndTriggerMobileNotification(station) {
         if (lastNotifiedStation === stationId && lastNotifiedLevel > 0) {
             lastNotifiedLevel = 0;
             if (Notification.permission === "granted") {
-                new Notification("✅ Nearest AWS Status: No Warning (N/W)", {
+                new Notification("✅ Nearest AWS Status: No Warning", {
                     body: `Monitoring station (${stationId}) has dropped back down to clear safety baselines.\n\nRecommendation:\n${recommendation}`,
                     icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
                     tag: 'ligtas-weather-alert'
