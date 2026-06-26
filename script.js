@@ -646,7 +646,7 @@ initSynchronizedAWSLayer('Lipa, Batangas AWS', 'https://raw.githubusercontent.co
 
 initSynchronizedAWSLayer('Tayabas-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tayabas%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Tayabas-Quezon AWS');
 
-initSynchronizedAWSLayer('Tanay, Rizal AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tayabas%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Tanay, Rizal AWS');
+initSynchronizedAWSLayer('Tanay, Rizal AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tanay%20Rizal%20AWS_RIL_HL.geojson', 'PAGASA-Tanay, Rizal AWS');
 
 
 // ==========================================
