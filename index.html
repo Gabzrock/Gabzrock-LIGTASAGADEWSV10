@@ -75,7 +75,6 @@
                 <span class="group-label">TOOLS</span>
                 <div class="button-pod">
                     <button class="nav-btn btn-warning" id="assessLocationBtn">Assess Location</button>
-                  <button class="nav-btn" id="toggleAutoAlertsBtn">🔔 Enable Track Alerts</button>
                      <button class="nav-btn" onclick="window.open('https://script.google.com/macros/s/AKfycbz5_G7ghXnc_k1vPKDVZA4VTCvf57YpK4PxULBT0GJM6Jhd_EBxObg4a2-EZkNSct8/exec', '_blank')">Detect Landslides</button>
                 </div>
             </div>
@@ -214,7 +213,7 @@
 <div id="awsAdvisoriesModal" class="ui-modal">
     <div class="ui-modal-content" style="max-width: 850px; width: 95%;">
         <span class="close-ui-modal" id="closeAwsAdvisoriesBtn">&times;</span>
-        <h3>📋 Landslide Warning Advisories</h3>
+        <h3>📋 AWS Station Advisories</h3>
         <p style="text-align: center; font-size: 0.95rem; color: #666; margin-bottom: 10px;">
             Current Status & 20km Buffer Coverage
         </p>
@@ -225,7 +224,7 @@
                     <tr>
                         <th>Station Name</th>
                         <th>Covered Area (Municipality)</th>
-                        <th>Rainfall (mm)</th>
+                        <th>Rainfall Antecedent+Cumulative (7-days)</th>
                         <th>Warning Level</th>
                     </tr>
                 </thead>
