@@ -522,8 +522,31 @@ const layerPromises = [
 
 let synchronizedLayers = []; 
 
+// 1. Create the Visual Sync Panel Leaflet Control
+L.Control.SyncPanel = L.Control.extend({
+    onAdd: function(map) {
+        const div = L.DomUtil.create('div', 'sync-panel leaflet-control');
+        div.id = 'aws-sync-panel';
+        L.DomEvent.disableClickPropagation(div);
+        div.innerHTML = `
+            <div class="sync-spinner"></div>
+            <div class="sync-text">
+                <strong>Landslide Warning Susceptibility Synchronizing </strong>
+                <span id="sync-status-text">Please wait while downloading other layers...</span>
+            </div>
+        `;
+        return div;
+    }
+});
+
+// 2. Add it to the map under the standard topright layer control
+if (map) {
+    new L.Control.SyncPanel({ position: 'topright' }).addTo(map);
+}
+
 function initSynchronizedAWSLayer(targetAwsName, geojsonUrl, layerDisplayName) {
-    fetch(geojsonUrl)
+    // 3. Return the promise so we can track completion status
+    return fetch(geojsonUrl)
         .then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); })
         .then(data => {
             const layer = L.geoJSON(data, {
@@ -538,6 +561,53 @@ function initSynchronizedAWSLayer(targetAwsName, geojsonUrl, layerDisplayName) {
         })
         .catch(err => console.error(`Error loading synced layer ${layerDisplayName}:`, err));
 }
+
+// AWS-LAYERED_SUSCEPTIBILITY_MAPS //
+// 4. Capture all calls in an array of promises
+const awsSyncPromises = [
+    //LIGTAS-AWS_RILEWS_MGB_SUSCEPTIBILITY_GEOJSON//
+    initSynchronizedAWSLayer('LANDGRANT', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Landgrant%20AWS_RIL_HL.geojson', 'LIGTAS LANDGRANT AWS'),
+    initSynchronizedAWSLayer('NAC', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_NAC%20AWS_RIL_HL.geojson', 'LIGTAS NAC 2026'),
+    initSynchronizedAWSLayer('PGPC', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_PGPC%20AWS_RIL_HL.geojson', 'VOTE PGPC AWS'),
+    initSynchronizedAWSLayer('MANKAYAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Mankayan%20AWS_RIL_HL.geojson', 'LIGTAS MANKAYAN AWS'),
+    initSynchronizedAWSLayer('BUGUIAS', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Buguias%20AWS_RIL_HL.geojson', 'LIGTAS BUGUIAS AWS'),
+    initSynchronizedAWSLayer('BOKOD', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Bokod%20AWS_RIL_HL.geojson', 'LIGTAS BOKOD AWS'),
+    initSynchronizedAWSLayer('COROZ', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Coroz%20AWS_RIL_HL.geojson', 'LIGTAS COROZ AWS'),
+    initSynchronizedAWSLayer('ITOGON', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Itogon%20AWS_RIL_HL.geojson', 'LIGTAS ITOGON AWS'),
+    initSynchronizedAWSLayer('CATANAUAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catanauan%20AWS_RIL_HL.geojson', 'LIGTAS CATANAUAN AWS'),
+    initSynchronizedAWSLayer('CATARMAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catarman%20AWS_RIL_HL.geojson', 'LIGTAS UEP-CATARMAN AWS'),
+
+    //PAGASA-AWS_RILEWS_MGB_SUSCEPTIBILITY_GEOJSON//
+    initSynchronizedAWSLayer('Los Banos, Laguna AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/UPLB%20Laguna%20AWS_RIL_HL.geojson', 'PAGASA-UP Los Banos, Laguna AWS'),
+    initSynchronizedAWSLayer('Polillio-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Polilo%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Polillio-Quezon AWS'),
+    initSynchronizedAWSLayer('Mulanay, Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Mulanay%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Mulanay, Quezon AWS'),
+    initSynchronizedAWSLayer('Pili Camarines Sur AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Pili%20Camarines%20Sur%20AWS_RIL_HL.geojson', 'PAGASA-Pili Camarines Sur AWS'),
+    initSynchronizedAWSLayer('Legazpi AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Legazpi%20Albay%20AWS_RIL_HL.geojson', 'PAGASA-Legazpi AWS'),
+    initSynchronizedAWSLayer('Northern-Samar AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Catarman%20Northern%20Samar%20AWS_RIL_HL.geojson', 'PAGASA-Northern-Samar AWS'),
+    initSynchronizedAWSLayer('Ambulong Tanauan Batangas AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Ambulong%20Tanauan%20Batangas%20AWS_RIL_HL.geojson', 'PAGASA-Ambulong Tanauan Batangas AWS'),
+    initSynchronizedAWSLayer('Lipa, Batangas AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Lipa%20Batangas%20AWS_RIL_HL.geojson', 'PAGASA-Lipa, Batangas AWS'),
+    initSynchronizedAWSLayer('Tayabas-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tayabas%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Tayabas-Quezon AWS'),
+    initSynchronizedAWSLayer('Tanay, Rizal AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tanay%20Rizal%20AWS_RIL_HL.geojson', 'PAGASA-Tanay, Rizal AWS'),
+    initSynchronizedAWSLayer('Sorsogon, Sorsogon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Sorsogon%20Sorsogon%20AWS_RIL_HL.geojson', 'PAGASA-Sorsogon, Sorsogon AWS')
+];
+
+// 5. Hide panel when all layers complete
+Promise.allSettled(awsSyncPromises).then(() => {
+    const syncPanel = document.getElementById('aws-sync-panel');
+    if (syncPanel) {
+        const spinner = syncPanel.querySelector('.sync-spinner');
+        const text = syncPanel.querySelector('#sync-status-text');
+        if (spinner) spinner.style.display = 'none';
+        if (text) text.innerText = 'All stations synced!';
+        
+        // Let user see completion status briefly, then fade out
+        setTimeout(() => {
+            syncPanel.style.opacity = '0';
+            setTimeout(() => syncPanel.remove(), 400); // Fully remove from DOM after fade
+        }, 1500); 
+    }
+});
+
 
 function syncAwsLayersWithData() {
     if (!cachedAWSData || cachedAWSData.length === 0) return;
@@ -612,43 +682,6 @@ function syncAwsLayersWithData() {
         }
     });
 }
-
-//AWS-LAYERED_SUSCEPTIBILITY_MAPS//
-
-//LIGTAS-AWS_RILEWS_MGB_SUSCEPTIBILITY_GEOJSON//
-initSynchronizedAWSLayer('LANDGRANT', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Landgrant%20AWS_RIL_HL.geojson', 'LIGTAS LANDGRANT AWS');
-initSynchronizedAWSLayer('NAC', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_NAC%20AWS_RIL_HL.geojson', 'LIGTAS NAC 2026');
-initSynchronizedAWSLayer('PGPC', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_PGPC%20AWS_RIL_HL.geojson', 'VOTE PGPC AWS');
-initSynchronizedAWSLayer('MANKAYAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Mankayan%20AWS_RIL_HL.geojson', 'LIGTAS MANKAYAN AWS');
-initSynchronizedAWSLayer('BUGUIAS', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Buguias%20AWS_RIL_HL.geojson', 'LIGTAS BUGUIAS AWS');
-initSynchronizedAWSLayer('BOKOD', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Bokod%20AWS_RIL_HL.geojson', 'LIGTAS BOKOD AWS');
-initSynchronizedAWSLayer('COROZ', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Coroz%20AWS_RIL_HL.geojson', 'LIGTAS COROZ AWS');
-initSynchronizedAWSLayer('ITOGON', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Itogon%20AWS_RIL_HL.geojson', 'LIGTAS ITOGON AWS');
-initSynchronizedAWSLayer('CATANAUAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catanauan%20AWS_RIL_HL.geojson', 'LIGTAS CATANAUAN AWS');
-initSynchronizedAWSLayer('CATARMAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catarman%20AWS_RIL_HL.geojson', 'LIGTAS UEP-CATARMAN AWS');
-
-//PAGASA-AWS_RILEWS_MGB_SUSCEPTIBILITY_GEOJSON//
-initSynchronizedAWSLayer('Los Banos, Laguna AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/UPLB%20Laguna%20AWS_RIL_HL.geojson', 'PAGASA-UP Los Banos, Laguna AWS');
-
-initSynchronizedAWSLayer('Polillio-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Polilo%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Polillio-Quezon AWS');
-
-initSynchronizedAWSLayer('Mulanay, Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Mulanay%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Mulanay, Quezon AWS');
-
-initSynchronizedAWSLayer('Pili Camarines Sur AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Pili%20Camarines%20Sur%20AWS_RIL_HL.geojson', 'PAGASA-Pili Camarines Sur AWS');
-
-initSynchronizedAWSLayer('Legazpi AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Legazpi%20Albay%20AWS_RIL_HL.geojson', 'PAGASA-Legazpi AWS');
-
-initSynchronizedAWSLayer('Northern-Samar AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Catarman%20Northern%20Samar%20AWS_RIL_HL.geojson', 'PAGASA-Northern-Samar AWS');
-
-initSynchronizedAWSLayer('Ambulong Tanauan Batangas AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Ambulong%20Tanauan%20Batangas%20AWS_RIL_HL.geojson', 'PAGASA-Ambulong Tanauan Batangas AWS');
-
-initSynchronizedAWSLayer('Lipa, Batangas AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Lipa%20Batangas%20AWS_RIL_HL.geojson', 'PAGASA-Lipa, Batangas AWS');
-
-initSynchronizedAWSLayer('Tayabas-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tayabas%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Tayabas-Quezon AWS');
-
-initSynchronizedAWSLayer('Tanay, Rizal AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tanay%20Rizal%20AWS_RIL_HL.geojson', 'PAGASA-Tanay, Rizal AWS');
-
-initSynchronizedAWSLayer('Sorsogon, Sorsogon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Sorsogon%20Sorsogon%20AWS_RIL_HL.geojson', 'PAGASA-Sorsogon, Sorsogon AWS');
 
 
 // ==========================================
