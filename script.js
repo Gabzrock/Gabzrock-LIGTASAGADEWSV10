@@ -1325,7 +1325,7 @@ if (downloadAwsAdvisoriesPdfBtn) {
         let fullHtml = `
             <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #008080; padding-bottom: 10px;">
                 <h2 style="color: #008080; margin: 0; font-size: 1.6rem;">LIGTAS-AGAD RILEWS</h2>
-                <h3 style="margin: 5px 0 0 0; color: #444; font-size: 1.2rem;">LIGTAS-AGAD RILEWS Rainfall-Landslide Warning Advisory </h3>
+                <h3 style="margin: 5px 0 0 0; color: #444; font-size: 1.2rem;">Rainfall-Landslide Warning Advisory </h3>
                 <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #666;">Report Generated as of: ${timeStr}</p>
             </div>
         `;
