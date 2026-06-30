@@ -588,7 +588,8 @@ const awsSyncPromises = [
     initSynchronizedAWSLayer('Lipa, Batangas AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Lipa%20Batangas%20AWS_RIL_HL.geojson', 'PAGASA-Lipa, Batangas AWS'),
     initSynchronizedAWSLayer('Tayabas-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tayabas%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Tayabas-Quezon AWS'),
     initSynchronizedAWSLayer('Tanay, Rizal AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tanay%20Rizal%20AWS_RIL_HL.geojson', 'PAGASA-Tanay, Rizal AWS'),
-    initSynchronizedAWSLayer('Sorsogon, Sorsogon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Sorsogon%20Sorsogon%20AWS_RIL_HL.geojson', 'PAGASA-Sorsogon, Sorsogon AWS')
+    initSynchronizedAWSLayer('Sorsogon, Sorsogon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Sorsogon%20Sorsogon%20AWS_RIL_HL.geojson', 'PAGASA-Sorsogon, Sorsogon AWS'),
+      initSynchronizedAWSLayer('Virac, Catanduanes AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Virac%20Catanduanes%20AWS_RIL_HL.geojson', 'PAGASA-Virac, Catanduanes AWS')
 ];
 
 // 5. Hide panel when all layers complete
