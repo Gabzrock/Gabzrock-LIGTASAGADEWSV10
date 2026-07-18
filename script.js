@@ -49,10 +49,8 @@ window.downloadPopupPDF = function(button) {
         if (!container) throw new Error("Popup content not found.");
 
         const element = container.cloneNode(true);
-        
         const actionsMenu = element.querySelector('.popup-actions');
         if(actionsMenu) actionsMenu.remove(); 
-
         const scrollContainer = element.querySelector('.popup-scroll-container');
         if(scrollContainer) { scrollContainer.style.maxHeight = 'none'; scrollContainer.style.overflow = 'visible'; }
 
@@ -71,21 +69,12 @@ window.downloadPopupPDF = function(button) {
 window.sharePopupData = function(button) {
     const container = button.closest('.popup-container');
     const headerTitle = container.querySelector('.popup-header').innerText;
-    
     const shareText = `Alert: Check out this LIGTAS-AGAD Warning Advisory regarding "${headerTitle}". View full real-time details here: ${window.location.href}`;
 
     if (navigator.share) {
-        navigator.share({
-            title: 'LIGTAS-AGAD Advisory',
-            text: shareText,
-            url: window.location.href
-        }).catch(err => console.error("User cancelled share or share failed", err));
+        navigator.share({ title: 'LIGTAS-AGAD Advisory', text: shareText, url: window.location.href }).catch(err => console.error("User cancelled share or share failed", err));
     } else {
-        navigator.clipboard.writeText(shareText).then(() => {
-            alert("Information copied to clipboard! You can now paste it directly into Facebook, Twitter, or Messenger.");
-        }).catch(err => {
-            showError("Failed to copy to clipboard.");
-        });
+        navigator.clipboard.writeText(shareText).then(() => { alert("Information copied to clipboard! You can now paste it directly into Facebook, Twitter, or Messenger."); }).catch(err => { showError("Failed to copy to clipboard."); });
     }
 };
 
@@ -108,6 +97,7 @@ setTimeout(hideLoadingScreen, 15000);
 
 let cachedAWSData = []; 
 let landslideFeatures = []; 
+let globalLayerOpacity = 0.3; // Default Susceptibility Opacity 30%
 
 function updateClock() {
     try {
@@ -122,7 +112,6 @@ function updateClock() {
 setInterval(updateClock, 1000); updateClock(); 
 
 function Homebutton() { window.location.href = 'https://ligtas.uplb.edu.ph/LIGTAS-AGAD_new_portal-main/';  }
-function AWSbutton() { window.location.href = 'https://gabzrock.github.io/LIGTAS-AGADLandslide-Warning-Advisories/'; }
 
 function formatPropertyName(key) {
     if (!key) return 'Unknown';
@@ -184,13 +173,46 @@ try {
     
     map = L.map('map').setView(initialCenter, initialZoom); 
     
+    // --- CREATE CUSTOM PANES ---
+    map.createPane('topTiles');
+    map.getPane('topTiles').style.zIndex = 450;
+    map.getPane('topTiles').style.pointerEvents = 'none';
+
+    map.createPane('maskOverlayPane');
+    map.getPane('maskOverlayPane').style.zIndex = 390; 
+    map.getPane('maskOverlayPane').style.pointerEvents = 'none';
+
+// Protected pane for LIGTAS Sites so they stay on top
+    map.createPane('siteBoundaries');
+    map.getPane('siteBoundaries').style.zIndex = 460;
+    map.getPane('siteBoundaries').style.pointerEvents = 'none'; // Lets clicks pass through to data below
+    // ---------------------------
+
+    // --- BASE LAYERS CONFIGURATION ---
     baseLayersData = {
-        "Streets": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }),
-        "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' }),
-        "Hybrid": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' }),
-        "Topo": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' })
+        "Streets": L.layerGroup([
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }),
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', opacity: 0.5, pane: 'topTiles' })
+        ]),
+        
+        "Satellite": L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri', opacity: 0.5, pane: 'topTiles' })
+        ]),
+        
+        "Hybrid": L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri', opacity: 0.5, pane: 'topTiles' }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { attribution: 'Labels &copy; Esri', opacity: 0.5, pane: 'topTiles' }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { attribution: 'Roads &copy; Esri', opacity: 0.5, pane: 'topTiles' })
+        ]),
+
+        "Topo": L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' }),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri', opacity: 0.5, pane: 'topTiles' })
+        ])
     };
-    baseLayersData["Streets"].addTo(map);
+    baseLayersData["Hybrid"].addTo(map);
 
     L.control.scale().addTo(map); L.control.locate().addTo(map);
     
@@ -336,7 +358,7 @@ const layerData = [
 ];
 
 const layerLogos = [
-    'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/Landslide-icon.png', 
+    'https://raw.githubusercontent.comz/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/Landslide-icon.png', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/logo3.png', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/logo3.png', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/logo3.png', 
@@ -454,13 +476,18 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
         .then(data => {
             if (name === 'LIGTAS-LSDB') landslideFeatures = data.features || [];
 
-            const layer = L.geoJSON(data, {
+const layer = L.geoJSON(data, {
                 style: styleOptions,
+                pane: styleOptions.pane || 'overlayPane',
+                interactive: styleOptions.interactive !== false, // <-- NEW: Disables click capture if false
                 pointToLayer: (feature, latlng) => {
                     if (iconUrl) { return L.marker(latlng, { icon: L.icon({ iconUrl: iconUrl, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12] }) }); } 
                     else { return L.circleMarker(latlng, { color: styleOptions.color || 'blue', fillColor: styleOptions.fillColor || styleOptions.color || 'blue', fillOpacity: styleOptions.fillOpacity || 0.8, radius: styleOptions.radius || 6, weight: styleOptions.weight || 1 }); }
                 },
                 onEachFeature: (feature, layer) => {
+                    // --- NEW: Skip building the popup if the layer isn't interactive ---
+                    if (styleOptions.interactive === false) return; 
+
                     let popupRows = '';
                     if (feature.properties) {
                         for (const [key, value] of Object.entries(feature.properties)) {
@@ -508,21 +535,65 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
 }
 
 const layerPromises = [
-    createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, className: 'flashing-high'}, null),
+createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, className: 'flashing-high', pane: 'markerPane'}, null),
     createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.1, weight: 0.7, className: 'flashing-high', customPopupName: 'High Landslide Risk Area' }),
     createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
     createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 }),
-    createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 0.2,}),
-    createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2,})
+createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 0.2, interactive: false }),
+createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2, pane: 'siteBoundaries', interactive: false })
 ];
 
+// --- BUILD INVERTED MASK FOR FOCUS MODE ---
+let invertedMaskLayer = null;
+fetch('https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson')
+    .then(res => res.json())
+    .then(data => {
+        const worldCoords = [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]];
+        let coordinates = [worldCoords];
+
+        data.features.forEach(feature => {
+            if (feature.geometry && feature.geometry.type === 'Polygon') {
+                coordinates.push(feature.geometry.coordinates[0]);
+            } else if (feature.geometry && feature.geometry.type === 'MultiPolygon') {
+                feature.geometry.coordinates.forEach(poly => {
+                    coordinates.push(poly[0]);
+                });
+            }
+        });
+
+        invertedMaskLayer = L.geoJSON({
+            "type": "Feature",
+            "geometry": { "type": "Polygon", "coordinates": coordinates }
+        }, {
+            style: {
+                fillColor: document.body.classList.contains('dark-mode') ? '#121212' : '#ffffff',
+                fillOpacity: 0.85,
+                color: 'transparent',
+                weight: 0
+            },
+            pane: 'maskOverlayPane',
+            interactive: false
+        });
+
+        // --- NEW: AUTO-ENABLE MASK ON LOAD ---
+        // We wait 1 second to ensure all UI elements and slider listeners are fully loaded, 
+        // then we simulate a click on the button to turn Focus Mode on.
+        setTimeout(() => {
+            const autoToggleBtn = document.getElementById('toggleMaskBtn');
+            if (autoToggleBtn && !autoToggleBtn.classList.contains('btn-active')) {
+                autoToggleBtn.click();
+            }
+        }, 1000); 
+        // -------------------------------------
+    })
+    .catch(err => console.error("Error building mask:", err));
+// ------------------------------------------
 // ==========================================
 // 5. SYNCHRONIZED AWS GEOJSON LAYERS
 // ==========================================
 
 let synchronizedLayers = []; 
 
-// 1. Create the Visual Sync Panel Leaflet Control
 L.Control.SyncPanel = L.Control.extend({
     onAdd: function(map) {
         const div = L.DomUtil.create('div', 'sync-panel leaflet-control');
@@ -539,18 +610,14 @@ L.Control.SyncPanel = L.Control.extend({
     }
 });
 
-// 2. Add it to the map under the standard topright layer control
-if (map) {
-    new L.Control.SyncPanel({ position: 'topright' }).addTo(map);
-}
+if (map) { new L.Control.SyncPanel({ position: 'topright' }).addTo(map); }
 
 function initSynchronizedAWSLayer(targetAwsName, geojsonUrl, layerDisplayName) {
-    // 3. Return the promise so we can track completion status
     return fetch(geojsonUrl)
         .then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); })
         .then(data => {
             const layer = L.geoJSON(data, {
-                style: { color: '#808080', weight: 1, opacity: 0.8 }, 
+                style: { color: '#808080', weight: 1, opacity: globalLayerOpacity, fillOpacity: globalLayerOpacity }, 
                 onEachFeature: (feature, layer) => { layer.bindPopup(`<b>${layerDisplayName}</b><br>Awaiting AWS synchronization...`); }
             }).addTo(map);
 
@@ -562,22 +629,17 @@ function initSynchronizedAWSLayer(targetAwsName, geojsonUrl, layerDisplayName) {
         .catch(err => console.error(`Error loading synced layer ${layerDisplayName}:`, err));
 }
 
-// AWS-LAYERED_SUSCEPTIBILITY_MAPS //
-// 4. Capture all calls in an array of promises
 const awsSyncPromises = [
-    //LIGTAS-AWS_RILEWS_MGB_SUSCEPTIBILITY_GEOJSON//
     initSynchronizedAWSLayer('LANDGRANT', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Landgrant%20AWS_RIL_HL.geojson', 'LIGTAS LANDGRANT AWS'),
     initSynchronizedAWSLayer('NAC', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_NAC%20AWS_RIL_HL.geojson', 'LIGTAS NAC 2026'),
     initSynchronizedAWSLayer('PGPC', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_PGPC%20AWS_RIL_HL.geojson', 'VOTE PGPC AWS'),
-    initSynchronizedAWSLayer('MANKAYAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Mankayan%20AWS_RIL_HL.geojson', 'LIGTAS MANKAYAN AWS'),
+    initSynchronizedAWSLayer('MANKAYAN', 'https://api.maptiler.com/data/019f44a0-c1f3-7d6c-a4cd-bf01ec8769e3/features.json?key=HnKlTumvQGjlZFqKA35V', 'LIGTAS MANKAYAN AWS'),
     initSynchronizedAWSLayer('BUGUIAS', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Buguias%20AWS_RIL_HL.geojson', 'LIGTAS BUGUIAS AWS'),
     initSynchronizedAWSLayer('BOKOD', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Bokod%20AWS_RIL_HL.geojson', 'LIGTAS BOKOD AWS'),
     initSynchronizedAWSLayer('COROZ', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Coroz%20AWS_RIL_HL.geojson', 'LIGTAS COROZ AWS'),
     initSynchronizedAWSLayer('ITOGON', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Itogon%20AWS_RIL_HL.geojson', 'LIGTAS ITOGON AWS'),
     initSynchronizedAWSLayer('CATANAUAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catanauan%20AWS_RIL_HL.geojson', 'LIGTAS CATANAUAN AWS'),
     initSynchronizedAWSLayer('CATARMAN', 'https://raw.githubusercontent.com/Gabzrock/LIGTASkanaba/refs/heads/main/LIGTAS_Catarman%20AWS_RIL_HL.geojson', 'LIGTAS UEP-CATARMAN AWS'),
-
-    //PAGASA-AWS_RILEWS_MGB_SUSCEPTIBILITY_GEOJSON//
     initSynchronizedAWSLayer('Los Banos, Laguna AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/UPLB%20Laguna%20AWS_RIL_HL.geojson', 'PAGASA-UP Los Banos, Laguna AWS'),
     initSynchronizedAWSLayer('Polillio-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Polilo%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Polillio-Quezon AWS'),
     initSynchronizedAWSLayer('Mulanay, Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Mulanay%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Mulanay, Quezon AWS'),
@@ -589,10 +651,9 @@ const awsSyncPromises = [
     initSynchronizedAWSLayer('Tayabas-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tayabas%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Tayabas-Quezon AWS'),
     initSynchronizedAWSLayer('Tanay, Rizal AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tanay%20Rizal%20AWS_RIL_HL.geojson', 'PAGASA-Tanay, Rizal AWS'),
     initSynchronizedAWSLayer('Sorsogon, Sorsogon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Sorsogon%20Sorsogon%20AWS_RIL_HL.geojson', 'PAGASA-Sorsogon, Sorsogon AWS'),
-      initSynchronizedAWSLayer('Virac, Catanduanes AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Virac%20Catanduanes%20AWS_RIL_HL.geojson', 'PAGASA-Virac, Catanduanes AWS')
+    initSynchronizedAWSLayer('Virac, Catanduanes AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Virac%20Catanduanes%20AWS_RIL_HL.geojson', 'PAGASA-Virac, Catanduanes AWS')
 ];
 
-// 5. Hide panel when all layers complete
 Promise.allSettled(awsSyncPromises).then(() => {
     const syncPanel = document.getElementById('aws-sync-panel');
     if (syncPanel) {
@@ -600,15 +661,12 @@ Promise.allSettled(awsSyncPromises).then(() => {
         const text = syncPanel.querySelector('#sync-status-text');
         if (spinner) spinner.style.display = 'none';
         if (text) text.innerText = 'All stations synced!';
-        
-        // Let user see completion status briefly, then fade out
         setTimeout(() => {
             syncPanel.style.opacity = '0';
-            setTimeout(() => syncPanel.remove(), 400); // Fully remove from DOM after fade
+            setTimeout(() => syncPanel.remove(), 400);
         }, 1500); 
     }
 });
-
 
 function syncAwsLayersWithData() {
     if (!cachedAWSData || cachedAWSData.length === 0) return;
@@ -641,7 +699,7 @@ function syncAwsLayersWithData() {
             else if (warningLevel === 3) targetColor = 'red'; 
             else if (warningLevel === 0 || rawLevel === '0') targetColor = 'transparent'; 
             
-            layerData.layer.setStyle({ color: targetColor, fillColor: targetColor, fillOpacity: 1, weight: 0.6, opacity: 1 });
+            layerData.layer.setStyle({ color: targetColor, fillColor: targetColor, fillOpacity: globalLayerOpacity, weight: 0.6, opacity: globalLayerOpacity });
             layerData.currentLevel = warningLevel;
             
             layerData.layer.eachLayer(featureLayer => {
@@ -684,9 +742,8 @@ function syncAwsLayersWithData() {
     });
 }
 
-
 // ==========================================
-// 6. CONTROLS INITIALIZATION
+// 6. CONTROLS INITIALIZATION & SLIDERS
 // ==========================================
 
 const legendContainer = document.getElementById('legendModalContent');
@@ -714,11 +771,86 @@ Promise.allSettled(layerPromises).then((results) => {
     const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
     if (failed.length > 0) { showError(`${failed.length} layers failed to load. Check network.`, 'warning'); }
 
-    try {
-        initSidebarControls(); 
-    } catch (e) { console.error("Error setting default layers", e); }
+    // --- NEW: AUTO-LOAD PH BOUNDARY ON STARTUP ---
+    const phBoundaryLayer = overlays['PH-Boundary: Boundary'];
+    if (phBoundaryLayer && !map.hasLayer(phBoundaryLayer)) {
+        map.addLayer(phBoundaryLayer);
+    }
+    // ---------------------------------------------
+
+    try { initSidebarControls(); } catch (e) { console.error("Error setting default layers", e); }
 });
 
+// --- SUSCEPTIBILITY OPACITY SLIDER LOGIC ---
+const opacitySlider = document.getElementById('opacitySlider');
+const opacityValue = document.getElementById('opacityValue');
+if (opacitySlider && opacityValue) {
+    opacitySlider.oninput = function() {
+        globalLayerOpacity = this.value / 100;
+        opacityValue.innerHTML = this.value + "%";
+        synchronizedLayers.forEach(layerData => {
+            if (layerData.layer) { layerData.layer.setStyle({ opacity: globalLayerOpacity, fillOpacity: globalLayerOpacity }); }
+        });
+    };
+}
+
+// --- BASE MAP OPACITY SLIDER LOGIC ---
+let globalBaseMapOpacity = 0.5; // Default 50%
+const baseMapOpacitySlider = document.getElementById('baseMapOpacitySlider');
+const baseMapOpacityValue = document.getElementById('baseMapOpacityValue');
+if (baseMapOpacitySlider && baseMapOpacityValue) {
+    baseMapOpacitySlider.oninput = function() {
+        globalBaseMapOpacity = this.value / 100;
+        baseMapOpacityValue.innerHTML = this.value + "%";
+        
+        Object.values(baseLayersData).forEach(layerGroup => {
+            if (layerGroup && typeof layerGroup.eachLayer === 'function') {
+                layerGroup.eachLayer(subLayer => {
+                    if (typeof subLayer.setOpacity === 'function' && subLayer.options.pane === 'topTiles') {
+                        subLayer.setOpacity(globalBaseMapOpacity);
+                    }
+                });
+            }
+        });
+    };
+}
+// --- BOUNDARY STYLE CONTROLS LOGIC ---
+const phBoundaryColor = document.getElementById('phBoundaryColor');
+const phBoundaryOpacitySlider = document.getElementById('phBoundaryOpacitySlider');
+const phBoundaryOpacityValue = document.getElementById('phBoundaryOpacityValue');
+
+const ligtasSitesColor = document.getElementById('ligtasSitesColor');
+const ligtasSitesOpacitySlider = document.getElementById('ligtasSitesOpacitySlider');
+const ligtasSitesOpacityValue = document.getElementById('ligtasSitesOpacityValue');
+
+// Helper function to update color and opacity dynamically
+function updateBoundaryStyle(layerName, colorInput, opacityInput, opacityText) {
+    const layer = overlays[layerName];
+    if (layer) {
+        const newColor = colorInput.value;
+        const newOpacity = opacityInput.value / 100;
+        if (opacityText) opacityText.innerHTML = opacityInput.value + "%";
+        
+        layer.setStyle({
+            color: newColor,       // Updates the border line color
+            fillColor: newColor,   // Updates the inside fill color
+            fillOpacity: newOpacity,
+            weight: 0.2            // Keeps the thin boundary line weight
+        });
+    }
+}
+
+// Attach event listeners so it updates in real-time as the user drags/clicks
+if (phBoundaryColor && phBoundaryOpacitySlider) {
+    phBoundaryColor.addEventListener('input', () => updateBoundaryStyle('PH-Boundary: Boundary', phBoundaryColor, phBoundaryOpacitySlider, phBoundaryOpacityValue));
+    phBoundaryOpacitySlider.addEventListener('input', () => updateBoundaryStyle('PH-Boundary: Boundary', phBoundaryColor, phBoundaryOpacitySlider, phBoundaryOpacityValue));
+}
+
+if (ligtasSitesColor && ligtasSitesOpacitySlider) {
+    ligtasSitesColor.addEventListener('input', () => updateBoundaryStyle('LIGTAS-AGAD sites: Boundary', ligtasSitesColor, ligtasSitesOpacitySlider, ligtasSitesOpacityValue));
+    ligtasSitesOpacitySlider.addEventListener('input', () => updateBoundaryStyle('LIGTAS-AGAD sites: Boundary', ligtasSitesColor, ligtasSitesOpacitySlider, ligtasSitesOpacityValue));
+}
+// -------------------------------------
 // ==========================================
 // 7. DATA FETCHING & PROCESSING
 // ==========================================
@@ -729,7 +861,6 @@ if (layerControl) { layerControl.addOverlay(warningLayerGroup, "20-KM Warning & 
 const googleSheetCSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSosfBP3StMyRUzwI0tUZPsLjPVH1zePCz8gZbTMOzjOvnonbmNCoy5VT46UxO0qdqb-Wm9EqTpXp8y/pub?gid=470430875&single=true&output=csv';
 
 function getBufferColor(warningLevel) { if (warningLevel === 1) return 'yellow'; if (warningLevel === 2) return 'orange'; if (warningLevel === 3) return 'red'; return null; }
-
 function getStationIcon(stationName) {
     if (stationName && stationName.includes('ASTI')) return layerLogos[6];
     if (stationName && stationName.includes('SARAI')) return layerLogos[5];
@@ -743,7 +874,6 @@ function updateAlertTicker() {
     if (!tickerEl || !tickerContainer || !cachedAWSData) return;
     
     let warningStations = [];
-    
     const prioritySortedData = [...cachedAWSData].sort((a, b) => {
         const levelA = parseInt(a.RainfallLandslidethresholdwarninglevel) || 0;
         const levelB = parseInt(b.RainfallLandslidethresholdwarninglevel) || 0;
@@ -756,13 +886,11 @@ function updateAlertTicker() {
             const name = station.StationName || station.Station || 'Unknown';
             const rawArea = station.Daterange || station.Municipality || station.LocationDetails || '';
             const areaDisplay = (rawArea && rawArea.toLowerCase() !== 'n/a') ? ` (${rawArea})` : '';
-
             let levelText = ''; let spanClass = '';
             
             if (level === 1) { levelText = 'Level 1 (Yellow)'; spanClass = 'level-1'; }
             else if (level === 2) { levelText = 'Level 2 (Orange)'; spanClass = 'level-2'; }
             else if (level === 3) { levelText = 'Level 3 (Red)'; spanClass = 'level-3'; }
-            
             warningStations.push(`<span class="${spanClass}">${name}${areaDisplay} - ${levelText}</span>`);
         }
     });
@@ -872,28 +1000,7 @@ fetchAndRefreshData(); setInterval(fetchAndRefreshData, 60000);
 // ==========================================
 
 const geojsonUrls = [
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_007-012_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_007-012_Bin6_100-200.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_013-018_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_025-030_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_031-036_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_049-054_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_055-060_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_055-060_Bin6_100-200.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_061-066_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_073-078_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_079-084_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_079-084_Bin6_100-200.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_097-102_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_097-102_Bin6_100-200.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_103-108_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_103-108_Bin6_100-200.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_109-114_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_121-126_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_127-132_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_127-132_Bin6_100-200.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_133-138_Bin5_50-100.geojson',
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_139-144_Bin5_50-100.geojson'
+'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_007-012_Bin5_50-100.geojson'
 ];
 const colors = ['yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow'];
 const rasterForecastUrls = [
@@ -1092,6 +1199,83 @@ if (defaultLayersBtn) {
     });
 }
 
+// --- MASK MAP TOGGLE LOGIC ---
+// --- MASK MAP TOGGLE LOGIC ---
+let preMaskSusOpacity = 30; // Memory for Susceptibility slider
+let preMaskBaseOpacity = 50; // Memory for Base Map slider
+
+const toggleMaskBtn = document.getElementById('toggleMaskBtn');
+if (toggleMaskBtn) {
+    toggleMaskBtn.addEventListener('click', () => {
+        // Grab the current state and slider elements
+        const isCurrentlyMasked = toggleMaskBtn.classList.contains('btn-active');
+        const susSlider = document.getElementById('opacitySlider');
+        const baseSlider = document.getElementById('baseMapOpacitySlider');
+
+        if (!isCurrentlyMasked) {
+            // =========================
+            // 1. TURN ON MASK
+            // =========================
+            toggleMaskBtn.innerText = '👁️ Unmask Map';
+            toggleMaskBtn.classList.remove('btn-warning');
+            toggleMaskBtn.classList.add('btn-active');
+            
+            // Add the inverted polygon mask
+            if (invertedMaskLayer) {
+                const isDark = document.body.classList.contains('dark-mode');
+                invertedMaskLayer.setStyle({ fillColor: isDark ? '#121212' : '#ffffff', fillOpacity: 0.85 });
+                map.addLayer(invertedMaskLayer);
+            }
+
+            // Auto-enable LIGTAS boundaries if they were turned off
+            const sitesLayerName = Object.keys(overlays).find(name => name.includes('LIGTAS-AGAD sites'));
+            if (sitesLayerName && overlays[sitesLayerName] && !map.hasLayer(overlays[sitesLayerName])) {
+                map.addLayer(overlays[sitesLayerName]);
+                document.querySelectorAll('.layer-toggle-input').forEach(cb => {
+                    if (cb.nextElementSibling && cb.nextElementSibling.innerText.includes('LIGTAS-AGAD sites')) {
+                        cb.checked = true;
+                    }
+                });
+            }
+
+            // Automate sliders for Focus Mode
+            if (susSlider && baseSlider) {
+                // Save the user's current settings before overriding
+                preMaskSusOpacity = susSlider.value;
+                preMaskBaseOpacity = baseSlider.value;
+                
+                // Set to 100% and 5% and trigger the visual updates
+                susSlider.value = 100;
+                susSlider.oninput();
+                
+                baseSlider.value = 30;
+                baseSlider.oninput();
+            }
+
+        } else {
+            // =========================
+            // 2. TURN OFF MASK
+            // =========================
+            toggleMaskBtn.innerText = '👁️ Mask Map';
+            toggleMaskBtn.classList.add('btn-warning');
+            toggleMaskBtn.classList.remove('btn-active');
+            
+            // Remove the inverted polygon mask
+            if (invertedMaskLayer) map.removeLayer(invertedMaskLayer);
+
+            // Revert sliders back to defaults / previous state
+            if (susSlider && baseSlider) {
+                susSlider.value = preMaskSusOpacity;
+                susSlider.oninput();
+                
+                baseSlider.value = preMaskBaseOpacity;
+                baseSlider.oninput();
+            }
+        }
+    });
+}
+// -----------------------------
+
 // ==========================================
 // 10. HAMBURGER MENU LOGIC
 // ==========================================
@@ -1120,7 +1304,6 @@ if (hamburgerBtn && subheaderMenu) {
 
 // ==========================================
 // 11. ALL STATIONS RAINFALL GRAPH & ADVISORIES 
-// (WITH REGIONAL FILTERING & CRASH PROTECTION)
 // ==========================================
 
 function getStationCategory(station) {
@@ -1153,9 +1336,7 @@ if (closeAllStationsGraphBtn) {
     closeAllStationsGraphBtn.onclick = () => { if(allStationsGraphModal) allStationsGraphModal.style.display = "none"; };
 }
 
-if (graphCategoryFilter) {
-    graphCategoryFilter.addEventListener('change', renderAllStationsGraph);
-}
+if (graphCategoryFilter) { graphCategoryFilter.addEventListener('change', renderAllStationsGraph); }
 
 function populateGraphCategoryDropdown() {
     if (!graphCategoryFilter || !cachedAWSData) return;
@@ -1429,11 +1610,17 @@ function enableDarkMode(isDark) {
             toggleDarkModeBtn.innerText = '☀️ Light Mode';
             toggleDarkModeBtn.classList.add('btn-warning');
         }
+        if (typeof invertedMaskLayer !== 'undefined' && invertedMaskLayer) {
+            invertedMaskLayer.setStyle({ fillColor: '#121212' });
+        }
     } else {
         document.body.classList.remove('dark-mode');
         if (toggleDarkModeBtn) {
             toggleDarkModeBtn.innerText = '🌙 Dark Mode';
             toggleDarkModeBtn.classList.remove('btn-warning');
+        }
+        if (typeof invertedMaskLayer !== 'undefined' && invertedMaskLayer) {
+            invertedMaskLayer.setStyle({ fillColor: '#ffffff' });
         }
     }
 }
@@ -1513,7 +1700,6 @@ let lastNotifiedLevel = -1;
 
 const toggleAutoAlertsBtn = document.getElementById('toggleAutoAlertsBtn');
 
-// Sync tracking button states right away when system loads based on real permissions
 function syncAlertUiPermissionState() {
     if (!toggleAutoAlertsBtn || !("Notification" in window)) return;
     if (Notification.permission === "denied") {
@@ -1531,20 +1717,13 @@ if (toggleAutoAlertsBtn) {
                 showError("Your mobile device or browser does not support native background push alerts.", "warning");
                 return;
             }
-            
-            // Proactively evaluate if the browser is hard-locked to denied status
             if (Notification.permission === "denied") {
                 issuePermissionRescueGuide();
                 return;
             }
-            
-            // Ask permission to the device browser cleanly matching strict execution constraints
             Notification.requestPermission().then(permission => {
-                if (permission === "granted") {
-                    startAutomatedAlerts();
-                } else {
-                    issuePermissionRescueGuide();
-                }
+                if (permission === "granted") { startAutomatedAlerts(); } 
+                else { issuePermissionRescueGuide(); }
             });
         } else {
             stopAutomatedAlerts();
@@ -1570,7 +1749,6 @@ function startAutomatedAlerts() {
     toggleAutoAlertsBtn.innerText = "🔕 Disable Track Alerts";
     toggleAutoAlertsBtn.classList.add('btn-active');
     showError("Automated tracking active. Monitoring nearest AWS 20km baseline thresholds...", "warning");
-    
     map.locate({ watch: true, setView: false, enableHighAccuracy: true, timeout: 20000 });
 }
 
@@ -1580,13 +1758,11 @@ function stopAutomatedAlerts() {
     lastNotifiedLevel = -1;
     toggleAutoAlertsBtn.innerText = "🔔 Enable Track Alerts";
     toggleAutoAlertsBtn.classList.remove('btn-active');
-    
     map.stopLocate();
     showError("Automated tracking alerts successfully disabled.", "warning");
 }
 
 function checkAndTriggerMobileNotification(station) {
-    // If user is outside the strict 20km radius loop, station returns null
     if (!station) return;
     
     const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
@@ -1594,13 +1770,11 @@ function checkAndTriggerMobileNotification(station) {
     const recommendation = station.Recommendedactions || "Continue regular observation and local tracking.";
     
     if (level >= 1) {
-        // Anti-spam confirmation check
         if (lastNotifiedStation === stationId && lastNotifiedLevel === level) return;
         
         lastNotifiedStation = stationId;
         lastNotifiedLevel = level;
         
-        // Structured Title and Body layout explicitly focusing on Level and Recommendations
         const title = `⚠️ AWS ALERT: Warning Level ${level}`;
         const body = `Nearest AWS: ${stationId} (${station.distance} km away)\n\nRecommendation:\n${recommendation}`;
         
@@ -1608,13 +1782,12 @@ function checkAndTriggerMobileNotification(station) {
             new Notification(title, {
                 body: body,
                 icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
-                vibrate: [300, 100, 300, 100, 400], // Mobile structural hardware haptic loop
+                vibrate: [300, 100, 300, 100, 400], 
                 tag: 'ligtas-weather-alert',
                 renotify: true
             });
         }
     } else {
-        // Handle resolution notification if an active threat baseline returns to safety parameters
         if (lastNotifiedStation === stationId && lastNotifiedLevel > 0) {
             lastNotifiedLevel = 0;
             if (Notification.permission === "granted") {
@@ -1626,4 +1799,439 @@ function checkAndTriggerMobileNotification(station) {
             }
         }
     }
+}
+// =========================================================
+// 15. CUSTOM GEOJSON LOADER (FILE & URL) - 10MB LIMIT
+// =========================================================
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+
+// Helper to draw the custom data on the map
+function addCustomGeojsonToMap(data, layerName, colorHex) {
+    try {
+        const layer = L.geoJSON(data, {
+            // Apply the user's chosen color here
+            style: { color: colorHex, weight: 2, fillOpacity: 0.3, fillColor: colorHex },
+            pointToLayer: (feature, latlng) => {
+                return L.circleMarker(latlng, { radius: 6, color: colorHex, fillColor: colorHex, fillOpacity: 0.8, weight: 1 });
+            },
+            onEachFeature: (feature, layer) => {
+                let popupRows = '';
+                if (feature.properties) {
+                    for (const [key, value] of Object.entries(feature.properties)) {
+                        popupRows += `<tr><th style="width:40%;">${key}</th><td>${value}</td></tr>`;
+                    }
+                }
+                const popupContent = `
+                    <div class="popup-container">
+                        <div class="popup-header" style="background-color: ${colorHex};">${layerName}</div>
+                        <div class="popup-scroll-container">
+                            <table class="popup-table">${popupRows || '<tr><td>No properties available.</td></tr>'}</table>
+                        </div>
+                    </div>
+                `;
+                layer.bindPopup(popupContent);
+                layer.on('click', () => { updatePropertiesTable(`Custom: ${layerName}`, feature.properties || {}); });
+            }
+        });
+
+        if (layer.getLayers().length === 0) throw new Error("No valid map features found in file.");
+
+        // Add to map and register to global lists
+        layer.addTo(map);
+        const finalName = `Custom: ${layerName}`;
+        overlays[finalName] = layer;
+        
+        if (layerControl) { layerControl.addOverlay(layer, finalName); }
+        if (typeof initSidebarControls === 'function') { initSidebarControls(); }
+        
+        map.fitBounds(layer.getBounds());
+        showError(`Successfully loaded: ${layerName}`, "warning"); 
+        
+    } catch (err) {
+        console.error(err);
+        showError("Failed to render GeoJSON. File may be corrupted or incorrectly formatted.", "error");
+    }
+}
+
+// 1. Handle Local File Upload
+const customFileInput = document.getElementById('customGeojsonFile');
+if (customFileInput) {
+    customFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > MAX_FILE_SIZE) {
+            showError("File exceeds the maximum 10MB limit.", "error");
+            customFileInput.value = "";
+            return;
+        }
+
+        // Get the chosen color
+        const colorInput = document.getElementById('customGeojsonColor');
+        const chosenColor = colorInput ? colorInput.value : '#9b59b6';
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const geojsonData = JSON.parse(event.target.result);
+                addCustomGeojsonToMap(geojsonData, file.name, chosenColor);
+            } catch (err) {
+                showError("Invalid JSON structure in file.", "error");
+            }
+            customFileInput.value = ""; 
+        };
+        reader.readAsText(file);
+    });
+}
+
+// 2. Handle Web URL Fetch
+const loadCustomUrlBtn = document.getElementById('loadCustomUrlBtn');
+const customGeojsonUrl = document.getElementById('customGeojsonUrl');
+if (loadCustomUrlBtn && customGeojsonUrl) {
+    loadCustomUrlBtn.addEventListener('click', function() {
+        const url = customGeojsonUrl.value.trim();
+        if (!url) return;
+
+        const originalText = loadCustomUrlBtn.innerText;
+        loadCustomUrlBtn.innerText = "⏳...";
+        loadCustomUrlBtn.disabled = true;
+
+        // Get the chosen color
+        const colorInput = document.getElementById('customGeojsonColor');
+        const chosenColor = colorInput ? colorInput.value : '#9b59b6';
+
+        fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const contentLength = response.headers.get('content-length');
+                if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
+                    throw new Error("Remote file exceeds the 10MB limit.");
+                }
+                return response.text();
+            })
+            .then(text => {
+                if (new Blob([text]).size > MAX_FILE_SIZE) {
+                    throw new Error("Remote file data exceeds the 10MB limit.");
+                }
+                const geojsonData = JSON.parse(text);
+                const filename = url.split('/').pop().split('?')[0] || 'Web Layer';
+                addCustomGeojsonToMap(geojsonData, filename, chosenColor);
+                customGeojsonUrl.value = ""; 
+            })
+            .catch(err => {
+                showError(err.message === "Failed to fetch" ? "Network error or blocked by CORS." : err.message, "error");
+            })
+            .finally(() => {
+                loadCustomUrlBtn.innerText = originalText;
+                loadCustomUrlBtn.disabled = false;
+            });
+    });
+}
+// =========================================================
+// 16. KMZ EXPORT FEATURE (BUG FIX & DATA SANITIZATION)
+// =========================================================
+
+const exportKmlBtn = document.getElementById('exportKmlBtn');
+if (exportKmlBtn) {
+    exportKmlBtn.addEventListener('click', () => {
+        // Check if BOTH libraries loaded properly
+        if (typeof tokml === 'undefined' || typeof JSZip === 'undefined') {
+            showError("Export libraries not loaded. Please wait a moment or check your internet connection.", "error");
+            return;
+        }
+
+        const originalText = exportKmlBtn.innerText;
+        exportKmlBtn.innerText = "⏳ Processing Map Data...";
+        exportKmlBtn.disabled = true;
+
+        try {
+            let allFeatures = [];
+
+            // --- DEFENSIVE DATA SANITIZER ---
+            function addSafeFeature(f, layerName) {
+                if (!f || !f.geometry || !f.geometry.type || !f.geometry.coordinates) return;
+                if (Array.isArray(f.geometry.coordinates) && f.geometry.coordinates.length === 0) return;
+
+                if (!f.properties) f.properties = {};
+                f.properties.LayerName = layerName; // Folders in Google Earth
+
+                // Flatten nested objects/arrays in properties 
+                for (let key in f.properties) {
+                    if (typeof f.properties[key] === 'object' && f.properties[key] !== null) {
+                        try {
+                            f.properties[key] = JSON.stringify(f.properties[key]);
+                        } catch (e) {
+                            f.properties[key] = "Data";
+                        }
+                    }
+                }
+                allFeatures.push(f);
+            }
+            // -----------------------------------------
+
+            // 1. Extract features from all standard Overlays & Custom Uploads
+            Object.keys(overlays).forEach(name => {
+                const layer = overlays[name];
+                if (map.hasLayer(layer) && typeof layer.toGeoJSON === 'function') {
+                    const geojson = layer.toGeoJSON();
+                    if (geojson.type === "FeatureCollection") {
+                        geojson.features.forEach(f => addSafeFeature(f, name));
+                    } else if (geojson.type === "Feature") {
+                        addSafeFeature(geojson, name);
+                    }
+                }
+            });
+
+            // 2. Extract features from the AWS Warning Buffers & Markers
+            if (typeof warningLayerGroup !== 'undefined' && map.hasLayer(warningLayerGroup)) {
+                warningLayerGroup.eachLayer(layer => {
+                    if (typeof layer.toGeoJSON === 'function') {
+                        const geojson = layer.toGeoJSON();
+                        if (geojson.type === "FeatureCollection") {
+                            geojson.features.forEach(f => addSafeFeature(f, "AWS Station / 20km Buffer"));
+                        } else {
+                            addSafeFeature(geojson, "AWS Station / 20km Buffer");
+                        }
+                    }
+                });
+            }
+
+            // 3. Extract user-drawn shapes (My Drawings)
+            if (typeof drawnItems !== 'undefined' && map.hasLayer(drawnItems)) {
+                drawnItems.eachLayer(layer => {
+                    if (typeof layer.toGeoJSON === 'function') {
+                        const geojson = layer.toGeoJSON();
+                        
+                        // Note: Leaflet Draw Circles natively export to GeoJSON as just a Point (the center).
+                        // Polygons, Rectangles, Lines, and Markers export perfectly.
+                        if (geojson.type === "FeatureCollection") {
+                            geojson.features.forEach(f => addSafeFeature(f, "My Drawings"));
+                        } else {
+                            addSafeFeature(geojson, "My Drawings");
+                        }
+                    }
+                });
+            }
+
+            if (allFeatures.length === 0) {
+                showError("No valid shapes to export. Turn on layers or draw shapes first.", "warning");
+                exportKmlBtn.innerText = originalText;
+                exportKmlBtn.disabled = false;
+                return;
+            }
+
+            const combinedGeoJSON = { type: "FeatureCollection", features: allFeatures };
+
+            // --- CONVERT TO KML ---
+            exportKmlBtn.innerText = "⏳ Converting to KML...";
+            let kmlString = "";
+            
+            try {
+                kmlString = tokml(combinedGeoJSON, {
+                    documentName: 'LIGTAS-AGAD Map Export',
+                    documentDescription: 'Exported active layers and drawings from LIGTAS-AGAD RILEWS',
+                    name: 'LayerName' 
+                });
+            } catch (tokmlError) {
+                console.error("tokml Conversion Error:", tokmlError);
+                throw new Error("Failed to convert map data. Check the console for invalid shape details.");
+            }
+
+            // --- COMPRESS INTO KMZ ---
+            exportKmlBtn.innerText = "⏳ Compressing KMZ...";
+            const zip = new JSZip();
+            zip.file("doc.kml", kmlString); 
+
+            zip.generateAsync({
+                type: "blob",
+                compression: "DEFLATE",
+                compressionOptions: { level: 6 } 
+            }).then(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
+                
+                a.href = url;
+                a.download = `LIGTAS_Export_${timestamp}.kmz`; 
+                
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showError("KMZ file downloaded successfully!", "warning");
+            }).catch(function(err) {
+                console.error("Zipping Error:", err);
+                throw new Error("Failed to compress file into KMZ format.");
+            }).finally(function() {
+                exportKmlBtn.innerText = originalText;
+                exportKmlBtn.disabled = false;
+            });
+
+        } catch (err) {
+            console.error("Export Process Error:", err);
+            showError(err.message || "An error occurred while building the map data.", "error");
+            exportKmlBtn.innerText = originalText;
+            exportKmlBtn.disabled = false;
+        }
+    });
+}
+// =========================================================
+// 17. EXPORT & IMPORT WORKSPACE SETTINGS (.TXT / JSON)
+// =========================================================
+
+const exportSettingsBtn = document.getElementById('exportSettingsBtn');
+const importSettingsFile = document.getElementById('importSettingsFile');
+
+// --- 1. EXPORT SETTINGS LOGIC ---
+if (exportSettingsBtn) {
+    exportSettingsBtn.addEventListener('click', () => {
+        try {
+            // Determine active base map name
+            let activeBaseMap = "Streets";
+            if (typeof baseLayersData !== 'undefined') {
+                for (const [name, layer] of Object.entries(baseLayersData)) {
+                    if (map.hasLayer(layer)) {
+                        activeBaseMap = name;
+                        break;
+                    }
+                }
+            }
+
+            // Collect checkboxes states from the sidebar
+            const layerToggleStates = {};
+            document.querySelectorAll('.layer-toggle-input').forEach(input => {
+                if (input.id) {
+                    layerToggleStates[input.id] = input.checked;
+                }
+            });
+
+            // Build Settings Bundle
+            const settingsBundle = {
+                version: "2.4",
+                timestamp: new Date().toISOString(),
+                mapState: {
+                    center: map.getCenter(),
+                    zoom: map.getZoom(),
+                    baseMap: activeBaseMap
+                },
+                themeState: {
+                    darkMode: document.body.classList.contains('dark-mode'),
+                    disableEffects: document.body.classList.contains('disable-effects'),
+                    isMasked: document.getElementById('toggleMaskBtn') && document.getElementById('toggleMaskBtn').classList.contains('btn-active')
+                },
+                sliders: {
+                    susceptibilityOpacity: document.getElementById('opacitySlider') ? document.getElementById('opacitySlider').value : 30,
+                    baseMapOpacity: document.getElementById('baseMapOpacitySlider') ? document.getElementById('baseMapOpacitySlider').value : 50,
+                    phBoundaryColor: document.getElementById('phBoundaryColor') ? document.getElementById('phBoundaryColor').value : '#ffffff',
+                    phBoundaryOpacity: document.getElementById('phBoundaryOpacitySlider') ? document.getElementById('phBoundaryOpacitySlider').value : 10,
+                    ligtasSitesColor: document.getElementById('ligtasSitesColor') ? document.getElementById('ligtasSitesColor').value : '#00ffff',
+                    ligtasSitesOpacity: document.getElementById('ligtasSitesOpacitySlider') ? document.getElementById('ligtasSitesOpacitySlider').value : 10
+                },
+                layers: layerToggleStates
+            };
+
+            // Convert to formatted string and trigger download
+            const dataStr = JSON.stringify(settingsBundle, null, 2);
+            const blob = new Blob([dataStr], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            const dateTag = new Date().toISOString().slice(0, 10);
+            a.href = url;
+            a.download = `LIGTAS_Settings_${dateTag}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showError("Workspace settings successfully exported to .txt!", "warning");
+        } catch (err) {
+            console.error("Export Settings Error:", err);
+            showError("Failed to export settings.", "error");
+        }
+    });
+}
+
+// --- 2. IMPORT SETTINGS LOGIC ---
+if (importSettingsFile) {
+    importSettingsFile.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const settings = JSON.parse(event.target.result);
+                
+                if (!settings || !settings.mapState || !settings.sliders) {
+                    throw new Error("Invalid format. Missing required settings structures.");
+                }
+
+                // A. Restore Map Viewport & Basemap
+                if (settings.mapState.center && settings.mapState.zoom) {
+                    map.setView([settings.mapState.center.lat, settings.mapState.center.lng], settings.mapState.zoom);
+                }
+                if (settings.mapState.baseMap && typeof baseLayersData !== 'undefined' && baseLayersData[settings.mapState.baseMap]) {
+                    Object.values(baseLayersData).forEach(layer => map.removeLayer(layer));
+                    map.addLayer(baseLayersData[settings.mapState.baseMap]);
+                }
+
+                // B. Restore Themes (Dark Mode & Visual Effects)
+                if (typeof enableDarkMode === 'function' && settings.themeState) {
+                    enableDarkMode(settings.themeState.darkMode);
+                    localStorage.setItem('ligtas-dark-mode', settings.themeState.darkMode);
+                }
+                const effectsBtn = document.getElementById('toggleEffectsBtn');
+                if (settings.themeState && effectsBtn) {
+                    const currentlyDisabled = document.body.classList.contains('disable-effects');
+                    if (settings.themeState.disableEffects !== currentlyDisabled) {
+                        effectsBtn.click();
+                    }
+                }
+
+                // C. Restore Sliders
+                const s = settings.sliders;
+                const triggerInput = (el, val) => {
+                    if (el) { el.value = val; el.dispatchEvent(new Event('input')); }
+                };
+
+                triggerInput(document.getElementById('opacitySlider'), s.susceptibilityOpacity);
+                triggerInput(document.getElementById('baseMapOpacitySlider'), s.baseMapOpacity);
+                triggerInput(document.getElementById('phBoundaryColor'), s.phBoundaryColor);
+                triggerInput(document.getElementById('phBoundaryOpacitySlider'), s.phBoundaryOpacity);
+                triggerInput(document.getElementById('ligtasSitesColor'), s.ligtasSitesColor);
+                triggerInput(document.getElementById('ligtasSitesOpacitySlider'), s.ligtasSitesOpacity);
+
+                // D. Restore Focus Mask Mode
+                const maskBtn = document.getElementById('toggleMaskBtn');
+                if (maskBtn && settings.themeState && typeof settings.themeState.isMasked !== 'undefined') {
+                    const isCurrentlyMasked = maskBtn.classList.contains('btn-active');
+                    if (settings.themeState.isMasked !== isCurrentlyMasked) {
+                        maskBtn.click();
+                    }
+                }
+
+                // E. Restore Layer Control Checkboxes & Visibilities
+                if (settings.layers) {
+                    for (const [id, shouldBeChecked] of Object.entries(settings.layers)) {
+                        const cb = document.getElementById(id);
+                        if (cb && cb.checked !== shouldBeChecked) {
+                            cb.click(); // Using click() natively toggles the Leaflet layer and UI syncs
+                        }
+                    }
+                }
+
+                showError("Workspace settings imported and restored successfully!", "warning");
+                importSettingsFile.value = ""; // Reset input so same file can be loaded again if needed
+                
+            } catch (err) {
+                console.error("Import Settings Error:", err);
+                showError("Failed to load settings file. Ensure it is a valid LIGTAS .txt configuration.", "error");
+                importSettingsFile.value = "";
+            }
+        };
+        reader.readAsText(file);
+    });
 }
