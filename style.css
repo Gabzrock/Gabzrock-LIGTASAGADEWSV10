@@ -76,7 +76,6 @@ body {
 #subheader::-webkit-scrollbar { display: none; }
 #subheader { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Subheader Scroll Arrows */
 .scroll-arrow {
     background: rgba(26, 59, 66, 0.95);
     color: #FFD700;
@@ -95,29 +94,9 @@ body {
 .left-arrow { left: 0; box-shadow: 2px 0 5px rgba(0,0,0,0.2); }
 .right-arrow { right: 0; box-shadow: -2px 0 5px rgba(0,0,0,0.2); }
 
-.button-group-container {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.group-label {
-    font-size: 0.65rem;
-    font-weight: 800;
-    color: rgba(255, 255, 255, 0.6);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    padding-left: 2px;
-}
-
-.button-pod {
-    display: flex;
-    gap: 6px; 
-    background: rgba(255, 255, 255, 0.05);
-    padding: 4px;
-    border-radius: 25px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
+.button-group-container { display: flex; flex-direction: column; gap: 4px; }
+.group-label { font-size: 0.65rem; font-weight: 800; color: rgba(255, 255, 255, 0.6); letter-spacing: 1px; text-transform: uppercase; padding-left: 2px; }
+.button-pod { display: flex; gap: 6px; background: rgba(255, 255, 255, 0.05); padding: 4px; border-radius: 25px; border: 1px solid rgba(255, 255, 255, 0.1); }
 
 .nav-btn {
     background-color: #ffffff; 
@@ -133,12 +112,7 @@ body {
     white-space: nowrap;
 }
 
-.nav-btn:hover {
-    background-color: #f0f8f8;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-}
-
+.nav-btn:hover { background-color: #f0f8f8; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
 .btn-danger { background-color: #e74c3c !important; color: white !important; border: 1px solid #c0392b !important; }
 .btn-warning { background-color: #FFA500 !important; color: white !important; border: 1px solid #e69500 !important; }
 .btn-success { background-color: #2ecc71 !important; color: white !important; border: 1px solid #27ae60 !important; }
@@ -147,31 +121,14 @@ body {
 /* =========================================
    3. MAP AREA & SCROLLABLE CONTAINER
    ========================================= */
-.map-panel-container {
-    flex-grow: 1;
-    width: 100%;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-}
-
-#map {
-    width: 100%;
-    flex-grow: 1;
-    z-index: 1;
-}
+.map-panel-container { flex-grow: 1; width: 100%; position: relative; display: flex; flex-direction: column; }
+#map { width: 100%; flex-grow: 1; z-index: 1; }
 
 /* =========================================
    4. UI MODALS (Properties, Controls, Legend, Graph)
    ========================================= */
-.ui-modal {
-    display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; 
-    background-color: rgba(0,0,0,0.4); backdrop-filter: blur(4px); align-items: center; justify-content: center;
-}
-.ui-modal-content {
-    background-color: var(--bg-white); margin: auto; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; display: flex; flex-direction: column; animation: zoomIn 0.2s ease-out;
-}
+.ui-modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); backdrop-filter: blur(4px); align-items: center; justify-content: center; }
+.ui-modal-content { background-color: var(--bg-white); margin: auto; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; display: flex; flex-direction: column; animation: zoomIn 0.2s ease-out; }
 .ui-modal-content h3 { margin-bottom: 15px; color: var(--dark-teal); font-size: 1.2rem; border-bottom: 2px solid var(--primary-color); padding-bottom: 8px; margin-top: 0; }
 .close-ui-modal { position: absolute; top: 15px; right: 20px; color: #999; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 1; }
 .close-ui-modal:hover, .close-ui-modal:focus { color: #333; text-decoration: none; }
@@ -193,9 +150,8 @@ body {
 .forecast-controls button { background-color: var(--primary-color); color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: background 0.2s; flex-grow: 1; }
 .forecast-controls button:hover { background-color: var(--dark-teal); }
 .slider-container { display: flex; flex-direction: column; gap: 5px; font-size: 0.9rem; font-weight: bold; }
-#speedSlider { width: 100%; }
+#speedSlider, #opacitySlider, #baseMapOpacitySlider { width: 100%; }
 
-/* Modal Legend Styles */
 .legend-item { display: flex; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
 .legend-logo { width: 24px; height: 24px; margin-right: 12px; object-fit: contain; }
 .legend-swatch { width: 20px; height: 20px; border: 1px solid #999; border-radius: 4px; margin-right: 12px; flex-shrink: 0; }
@@ -203,21 +159,10 @@ body {
 .legend-text strong { display: block; color: #222; }
 .legend-text span { font-size: 0.8rem; color: #666; }
 
-/* Custom Scrollbar for the Chart Wrapper */
-.chart-scroll-wrapper::-webkit-scrollbar {
-    height: 10px; 
-}
-.chart-scroll-wrapper::-webkit-scrollbar-track {
-    background: #f1f1f1; 
-    border-radius: 5px;
-}
-.chart-scroll-wrapper::-webkit-scrollbar-thumb {
-    background: var(--primary-color); 
-    border-radius: 5px;
-}
-.chart-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-    background: var(--dark-teal); 
-}
+.chart-scroll-wrapper::-webkit-scrollbar { height: 10px; }
+.chart-scroll-wrapper::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 5px; }
+.chart-scroll-wrapper::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 5px; }
+.chart-scroll-wrapper::-webkit-scrollbar-thumb:hover { background: var(--dark-teal); }
 
 /* =========================================
    5. CUSTOM POPUPS, CREDITS & SHARE BUTTON
@@ -231,10 +176,8 @@ body {
 .popup-table th { background-color: #fafafa; color: #555; width: 40%; }
 .popup-table img { max-width: 100%; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd; transition: transform 0.2s; }
 .popup-table img:hover { transform: scale(1.02); }
-
 .popup-credits { text-align: center; font-size: 0.7rem; color: #666; padding: 8px 5px; background: #fafafa; border-top: 1px solid #eee; line-height: 1.2; }
 .popup-credits strong { color: var(--primary-color); }
-
 .popup-actions { display: flex; width: 100%; }
 .popup-actions button { flex: 1; padding: 10px; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; margin-top: 0; font-size: 0.9rem; }
 .pdf-btn { background-color: var(--primary-color); border-radius: 0 0 0 5px; }
@@ -252,64 +195,12 @@ body {
 .leaflet-control-custom:hover { background-color: #f4f4f4 !important; }
 
 /* Custom GPS Image Button - Middle Right */
-.leaflet-right .gps-image-btn {
-    position: absolute;
-    right: 10px; 
-    top: 50vh;   
-    transform: translateY(-50%); 
-    margin-top: 0;
-    z-index: 1000;
-}
-
-.gps-image-btn {
-    position: relative; 
-    background-color: transparent !important; 
-    width: 100px !important;  
-    height: 100px !important; 
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border: none !important; 
-    box-shadow: none !important; 
-}
-
-.gps-image-btn img {
-    width: 80px;  
-    height: 80px;
-    object-fit: contain;
-    cursor: pointer;
-    transition: transform 0.2s;
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); 
-}
-
-.gps-image-btn img:hover {
-    transform: scale(1.1); 
-}
-
-.gps-close-btn {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 24px;
-    height: 24px;
-    background-color: #e74c3c; 
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 18px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
-    z-index: 10;
-    transition: all 0.2s;
-}
-
-.gps-close-btn:hover {
-    background-color: #c0392b;
-    transform: scale(1.2); 
-}
+.leaflet-right .gps-image-btn { position: absolute; right: 10px; top: 50vh; transform: translateY(-50%); margin-top: 0; z-index: 1000; }
+.gps-image-btn { position: relative; background-color: transparent !important; width: 100px !important; height: 100px !important; display: flex; justify-content: center; align-items: center; border: none !important; box-shadow: none !important; }
+.gps-image-btn img { width: 80px; height: 80px; object-fit: contain; cursor: pointer; transition: transform 0.2s; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
+.gps-image-btn img:hover { transform: scale(1.1); }
+.gps-close-btn { position: absolute; top: 5px; right: 5px; width: 24px; height: 24px; background-color: #e74c3c; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.4); z-index: 10; transition: all 0.2s; }
+.gps-close-btn:hover { background-color: #c0392b; transform: scale(1.2); }
 
 /* =========================================
    7. ANIMATIONS, SPLASH SCREEN & MODALS
@@ -325,35 +216,14 @@ body {
 .splash-logos img { height: 110px; object-fit: contain; margin-bottom: 25px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); }
 .splash-content h1 { font-size: 2.2rem; margin-bottom: 5px; letter-spacing: 1px; color: #ffffff; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
 .splash-content p { font-size: 1.1rem; opacity: 0.9; margin-bottom: 30px; font-weight: 500; }
-.splash-spinner {
-    border: 5px solid rgba(255,255,255,0.2); border-top: 5px solid #FFD700;
-    border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite;
-    margin: 0 auto 20px;
-}
+.splash-spinner { border: 5px solid rgba(255,255,255,0.2); border-top: 5px solid #FFD700; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
 #splash-message { font-weight: bold; font-size: 1.1rem; color: #FFD700; letter-spacing: 0.5px; }
 
-/* 🔴 OPTIMIZED HARDWARE-ACCELERATED EFFECTS */
-@keyframes pulse-expand {
-    0% { transform: scale(0.5); opacity: 1.5; }
-    100% { transform: scale(1.0); opacity: 0; }
-}
-.pulse-layer { 
-    transform-box: fill-box; 
-    transform-origin: center center; 
-    animation: pulse-expand 4s infinite cubic-bezier(0.2, 0.6, 0.4, 1); 
-    pointer-events: none; 
-    will-change: transform, opacity; 
-}
+@keyframes pulse-expand { 0% { transform: scale(0.5); opacity: 1.5; } 100% { transform: scale(1.0); opacity: 0; } }
+.pulse-layer { transform-box: fill-box; transform-origin: center center; animation: pulse-expand 4s infinite cubic-bezier(0.2, 0.6, 0.4, 1); pointer-events: none; will-change: transform, opacity; }
 
-@keyframes flash { 
-    0% { opacity: 1; } 
-    50% { opacity: 0.2; } 
-    100% { opacity: 1; } 
-}
-.flashing-high { 
-    animation: flash 4s infinite ease-in-out; 
-    will-change: opacity; 
-}
+@keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+.flashing-high { animation: flash 4s infinite ease-in-out; will-change: opacity; }
 
 body.disable-effects .pulse-layer { display: none !important; }
 body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !important; }
@@ -388,87 +258,22 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
     .scroll-arrow { display: none !important; }
     #subheader-wrapper { background: none; box-shadow: none; position: static; }
 
-    /* HAMBURGER MENU OVERRIDES WITH SCROLLBAR FIX */
-    #subheader {
-        display: none !important; 
-        flex-direction: column; 
-        position: absolute; 
-        top: 50px; left: 0; width: 100%;
-        background: linear-gradient(135deg, rgba(26, 59, 66, 0.98), rgba(38, 129, 113, 0.98));
-        padding: 20px; 
-        padding-bottom: 80px; 
-        height: auto;
-        max-height: calc(100vh - 50px);
-        overflow-y: auto; 
-        overflow-x: hidden;
-        align-items: flex-start;
-        gap: 25px;
-        z-index: 9999 !important;
-    }
+    #subheader { display: none !important; flex-direction: column; position: absolute; top: 50px; left: 0; width: 100%; background: linear-gradient(135deg, rgba(26, 59, 66, 0.98), rgba(38, 129, 113, 0.98)); padding: 20px; padding-bottom: 80px; height: auto; max-height: calc(100vh - 50px); overflow-y: auto; overflow-x: hidden; align-items: flex-start; gap: 25px; z-index: 9999 !important; }
     #subheader.show-menu { display: flex !important; animation: slideDown 0.2s ease-out forwards; }
     
-    #subheader::-webkit-scrollbar {
-        display: block !important; 
-        width: 6px;
-    }
-    #subheader::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05); 
-    }
-    #subheader::-webkit-scrollbar-thumb {
-        background: rgba(255, 215, 0, 0.6); 
-        border-radius: 10px;
-    }
+    #subheader::-webkit-scrollbar { display: block !important; width: 6px; }
+    #subheader::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+    #subheader::-webkit-scrollbar-thumb { background: rgba(255, 215, 0, 0.6); border-radius: 10px; }
     
     .button-group-container { width: 100%; }
-    
-    .group-label {
-        color: #FFD700;
-        font-size: 0.75rem;
-        margin-bottom: 5px;
-        border-bottom: 1px solid rgba(255, 215, 0, 0.3);
-        padding-bottom: 3px;
-    }
-
-    .button-pod {
-        flex-direction: column;
-        width: 100%;
-        background: none;
-        padding: 0;
-        border: none;
-        gap: 10px;
-    }
-
-    .nav-btn {
-        width: 100%;
-        padding: 12px;
-        text-align: center;
-        border-radius: 8px;
-    }
+    .group-label { color: #FFD700; font-size: 0.75rem; margin-bottom: 5px; border-bottom: 1px solid rgba(255, 215, 0, 0.3); padding-bottom: 3px; }
+    .button-pod { flex-direction: column; width: 100%; background: none; padding: 0; border: none; gap: 10px; }
+    .nav-btn { width: 100%; padding: 12px; text-align: center; border-radius: 8px; }
 
     #subheader:not(.show-menu), .header-controls:not(.show-menu) { display: none !important; height: 0 !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: none !important; overflow: hidden !important; }
     
-  .map-panel-container {
-        overflow: hidden; /* Prevents double scrollbars on mobile */
-        padding: 5px; /* Slightly tighter padding to maximize map space */
-        background-color: #f4f4f4;
-        
-        /* Use 'dvh' to account for mobile address bars shrinking/growing */
-        height: calc(100vh - 90px); /* Fallback for older browsers */
-        height: calc(100dvh - 90px); /* Subtract Header (50px) + Ticker (40px) */
-        
-        display: flex;
-        flex-direction: column;
-    }
-
-    #map {
-        min-height: 0 !important; 
-        height: 100%;
-        flex-grow: 1; 
-        
-        border-radius: 12px;
-        border: 1px solid #ddd;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
+    .map-panel-container { overflow: hidden; padding: 5px; background-color: #f4f4f4; height: calc(100vh - 90px); height: calc(100dvh - 90px); display: flex; flex-direction: column; }
+    #map { min-height: 0 !important; height: 100%; flex-grow: 1; border-radius: 12px; border: 1px solid #ddd; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
     .ui-modal-content { width: 95%; max-width: none; }
     .splash-content h1 { font-size: 1.5rem; }
     .splash-logos img { height: 80px; }
@@ -478,17 +283,12 @@ body.disable-effects .flashing-high { animation: none !important; opacity: 0.8 !
 /* =========================================
    9. DARK MODE THEME
    ========================================= */
-body.dark-mode {
-    background-color: #121212;
-    color: #e0e0e0;
-}
+body.dark-mode { background-color: #121212; color: #e0e0e0; }
+body.dark-mode .map-panel-container { background-color: #121212; }
 
-body.dark-mode .map-panel-container {
-    background-color: #121212;
-}
-
-/* Clever trick to make Leaflet Maps dark without breaking tiles */
-body.dark-mode .leaflet-tile-pane {
+/* Clever trick to make Leaflet Maps dark without breaking tiles - Including new topTiles pane */
+body.dark-mode .leaflet-tile-pane,
+body.dark-mode .leaflet-toptiles-pane {
     filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
 
@@ -508,10 +308,7 @@ body.dark-mode .panel-content h4 { color: #80cbc4; border-bottom: 1px solid #444
 
 /* Popups inside the Map */
 body.dark-mode .leaflet-popup-content-wrapper,
-body.dark-mode .leaflet-popup-tip {
-    background: #1e1e1e;
-    color: #e0e0e0;
-}
+body.dark-mode .leaflet-popup-tip { background: #1e1e1e; color: #e0e0e0; }
 body.dark-mode .popup-scroll-container { background: #1e1e1e; }
 body.dark-mode .popup-section-title { background-color: #2c2c2c; color: #80cbc4; border-top: 1px solid #444; border-bottom: 1px solid #444; }
 body.dark-mode .popup-table th { background-color: #2a2a2a; color: #ccc; border-bottom: 1px solid #444; }
@@ -526,105 +323,51 @@ body.dark-mode .chart-scroll-wrapper { border: 1px solid #444; }
 /* =========================================
    14. SCROLLING ALERT TICKER
    ========================================= */
-#alert-ticker {
-    flex-shrink: 0;
-    height: 40px;
-    background-color: #27ae60; 
-    color: white;
-    display: flex;
-    align-items: center;
-    z-index: 4000;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
-    transition: background-color 0.5s;
-}
-
-.ticker-label {
-    background-color: rgba(0, 0, 0, 0.3);
-    color: #fff;
-    font-weight: bold;
-    padding: 0 15px;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    z-index: 2;
-    white-space: nowrap;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.ticker-content-wrapper {
-    flex-grow: 1;
-    overflow: hidden;
-    position: relative;
-    height: 100%;
-}
-
-.ticker-text {
-    position: absolute;
-    white-space: nowrap;
-    line-height: 40px;
-    font-weight: 600;
-    font-size: 1.05rem;
-    animation: ticker-scroll 150s linear infinite;
-}
-
-/* Pause animation on hover */
-.ticker-content-wrapper:hover .ticker-text {
-    animation-play-state: paused;
-}
-
+#alert-ticker { flex-shrink: 0; height: 40px; background-color: #27ae60; color: white; display: flex; align-items: center; z-index: 4000; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); transition: background-color 0.5s; }
+.ticker-label { background-color: rgba(0, 0, 0, 0.3); color: #fff; font-weight: bold; padding: 0 15px; height: 100%; display: flex; align-items: center; z-index: 2; white-space: nowrap; text-transform: uppercase; letter-spacing: 1px; }
+.ticker-content-wrapper { flex-grow: 1; overflow: hidden; position: relative; height: 100%; }
+.ticker-text { position: absolute; white-space: nowrap; line-height: 40px; font-weight: 600; font-size: 1.05rem; animation: ticker-scroll 150s linear infinite; }
+.ticker-content-wrapper:hover .ticker-text { animation-play-state: paused; }
 .ticker-text span.level-1 { color: #FFD700; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); } 
 .ticker-text span.level-2 { color: #FFA500; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); } 
 .ticker-text span.level-3 { color: #ffcccc; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); } 
 
-@keyframes ticker-scroll {
-    0% { transform: translateX(100vw); }
-    100% { transform: translateX(-100%); }
-}
+@keyframes ticker-scroll { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
 
 /* =========================================
    AWS SYNCHRONIZATION PANEL
    ========================================= */
-.sync-panel {
-    background-color: var(--bg-white, rgba(255, 255, 255, 0.95));
-    padding: 10px 15px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    margin-top: 10px !important; /* Forces it to sit cleanly below the layer toggle */
-    transition: opacity 0.3s ease;
+.sync-panel { background-color: var(--bg-white, rgba(255, 255, 255, 0.95)); padding: 10px 15px; border-radius: 6px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); margin-top: 10px !important; transition: opacity 0.3s ease; }
+.sync-spinner { width: 18px; height: 18px; border: 3px solid #eee; border-top: 3px solid var(--secondary-color, #e67e22); border-radius: 50%; animation: sync-spin 1s linear infinite; }
+@keyframes sync-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.sync-text { display: flex; flex-direction: column; line-height: 1.3; }
+.sync-text strong { font-size: 0.85rem; color: var(--dark-teal, #1a3b42); text-transform: uppercase; }
+.sync-text span { font-size: 0.75rem; color: #666; font-weight: 500; }
+/* =========================================
+   DISABLE EFFECTS OVERRIDE FOR TICKER
+   ========================================= */
+body.disable-effects .ticker-content-wrapper {
+    overflow-x: auto; /* Allows the user to manually swipe/scroll to read it */
 }
 
-.sync-spinner {
-    width: 18px;
-    height: 18px;
-    border: 3px solid #eee;
-    border-top: 3px solid var(--secondary-color, #e67e22);
-    border-radius: 50%;
-    animation: sync-spin 1s linear infinite;
+body.disable-effects .ticker-text {
+    animation: none !important; /* Stops the heavy CPU animation */
+    transform: translateX(0) !important; /* Resets it to the left side */
+    position: relative !important; 
+    padding-left: 15px; 
+}
+/* =========================================
+   17. WORKSPACE SETTINGS PANEL DARK MODE
+   ========================================= */
+body.dark-mode #controlsModal div[style*="background: #f8f9fa"] {
+    background: #2a2a2a !important;
+    border-color: #444 !important;
 }
 
-@keyframes sync-spin { 
-    0% { transform: rotate(0deg); } 
-    100% { transform: rotate(360deg); } 
+body.dark-mode #controlsModal div[style*="background: #f8f9fa"] span {
+    color: #bbb !important;
 }
 
-.sync-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.3;
-}
-
-.sync-text strong {
-    font-size: 0.85rem;
-    color: var(--dark-teal, #1a3b42);
-    text-transform: uppercase;
-}
-
-.sync-text span {
-    font-size: 0.75rem;
-    color: #666;
-    font-weight: 500;
+body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
+    color: #80cbc4 !important;
 }
