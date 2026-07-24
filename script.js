@@ -1252,7 +1252,7 @@ if (toggleMaskBtn) {
                 susSlider.value = 100;
                 susSlider.oninput();
                 
-                baseSlider.value = 30;
+                baseSlider.value = 50;
                 baseSlider.oninput();
             }
 
@@ -2126,7 +2126,7 @@ if (exportSettingsBtn) {
                     isMasked: document.getElementById('toggleMaskBtn') && document.getElementById('toggleMaskBtn').classList.contains('btn-active')
                 },
                 sliders: {
-                    susceptibilityOpacity: document.getElementById('opacitySlider') ? document.getElementById('opacitySlider').value : 30,
+                    susceptibilityOpacity: document.getElementById('opacitySlider') ? document.getElementById('opacitySlider').value : 50,
                     baseMapOpacity: document.getElementById('baseMapOpacitySlider') ? document.getElementById('baseMapOpacitySlider').value : 50,
                     phBoundaryColor: document.getElementById('phBoundaryColor') ? document.getElementById('phBoundaryColor').value : '#ffffff',
                     phBoundaryOpacity: document.getElementById('phBoundaryOpacitySlider') ? document.getElementById('phBoundaryOpacitySlider').value : 10,
