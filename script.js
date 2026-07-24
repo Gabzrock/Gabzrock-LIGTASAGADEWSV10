@@ -540,7 +540,7 @@ createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubuser
     createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
     createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 }),
 createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 0.2, interactive: false },null),
-createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2, pane: 'siteBoundaries', interactive: false },null)
+createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2, pane: 'siteBoundaries', interactive: false })
 ];
 
 // --- BUILD INVERTED MASK FOR FOCUS MODE ---
@@ -651,7 +651,11 @@ const awsSyncPromises = [
     initSynchronizedAWSLayer('Tayabas-Quezon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tayabas%20Quezon%20AWS_RIL_HL.geojson', 'PAGASA-Tayabas-Quezon AWS'),
     initSynchronizedAWSLayer('Tanay, Rizal AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tanay%20Rizal%20AWS_RIL_HL.geojson', 'PAGASA-Tanay, Rizal AWS'),
     initSynchronizedAWSLayer('Sorsogon, Sorsogon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Sorsogon%20Sorsogon%20AWS_RIL_HL.geojson', 'PAGASA-Sorsogon, Sorsogon AWS'),
-    initSynchronizedAWSLayer('Virac, Catanduanes AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Virac%20Catanduanes%20AWS_RIL_HL.geojson', 'PAGASA-Virac, Catanduanes AWS')
+    initSynchronizedAWSLayer('Virac, Catanduanes AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Virac%20Catanduanes%20AWS_RIL_HL.geojson', 'PAGASA-Virac, Catanduanes AWS'),
+      initSynchronizedAWSLayer('LIGTAS-AGAD PASIL AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Pasil%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD PASIL AWS'),
+      initSynchronizedAWSLayer('LIGTAS-AGAD Licuan-Baay AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Licuan%20Baay%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Licuan-Baay AWS'),
+        initSynchronizedAWSLayer('LIGTAS-AGAD Calanasan AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Calanasan%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Calanasan AWS'),
+          initSynchronizedAWSLayer('LIGTAS-AGAD Barlig AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Barlig%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Barlig AWS')
 ];
 
 Promise.allSettled(awsSyncPromises).then(() => {
