@@ -536,11 +536,11 @@ const layer = L.geoJSON(data, {
 
 const layerPromises = [
 createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, pane: 'markerPane'}, null),
-    createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.1, weight: 0.7, className: 'flashing-high', customPopupName: 'High Landslide Risk Area' }),
+    createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.6, weight: 1, customPopupName: 'High Landslide Risk Area' }),
     createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
     createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 }),
-createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.1, weight: 0.2, interactive: false },null),
-createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'cyan', fillOpacity: 0.1, weight: 0.2, pane: 'siteBoundaries', interactive: false })
+createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.0, weight: 0.5, interactive: false },null),
+createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'white', fillOpacity: 0.0, weight: 0.5, pane: 'siteBoundaries', interactive: false })
 ];
 
 // --- BUILD INVERTED MASK FOR FOCUS MODE ---
@@ -2110,7 +2110,7 @@ if (exportSettingsBtn) {
                     layerToggleStates[input.id] = input.checked;
                 }
             });
-
+//PH-Boundary Opacity & LIGTAS Sites Opacity configuration
             // Build Settings Bundle
             const settingsBundle = {
                 version: "2.4",
@@ -2126,12 +2126,12 @@ if (exportSettingsBtn) {
                     isMasked: document.getElementById('toggleMaskBtn') && document.getElementById('toggleMaskBtn').classList.contains('btn-active')
                 },
                 sliders: {
-                    susceptibilityOpacity: document.getElementById('opacitySlider') ? document.getElementById('opacitySlider').value : 50,
+                    susceptibilityOpacity: document.getElementById('opacitySlider') ? document.getElementById('opacitySlider').value : 100,
                     baseMapOpacity: document.getElementById('baseMapOpacitySlider') ? document.getElementById('baseMapOpacitySlider').value : 50,
                     phBoundaryColor: document.getElementById('phBoundaryColor') ? document.getElementById('phBoundaryColor').value : '#ffffff',
-                    phBoundaryOpacity: document.getElementById('phBoundaryOpacitySlider') ? document.getElementById('phBoundaryOpacitySlider').value : 10,
-                    ligtasSitesColor: document.getElementById('ligtasSitesColor') ? document.getElementById('ligtasSitesColor').value : '#00ffff',
-                    ligtasSitesOpacity: document.getElementById('ligtasSitesOpacitySlider') ? document.getElementById('ligtasSitesOpacitySlider').value : 10
+                    phBoundaryOpacity: document.getElementById('phBoundaryOpacitySlider') ? document.getElementById('phBoundaryOpacitySlider').value : 0,
+                    ligtasSitesColor: document.getElementById('ligtasSitesColor') ? document.getElementById('ligtasSitesColor').value : '#ffffff',
+                    ligtasSitesOpacity: document.getElementById('ligtasSitesOpacitySlider') ? document.getElementById('ligtasSitesOpacitySlider').value : 0
                 },
                 layers: layerToggleStates
             };
