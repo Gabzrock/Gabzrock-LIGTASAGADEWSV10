@@ -36,7 +36,11 @@ function hideLoadingScreen() {
 window.addEventListener('offline', () => { showError("Internet connection lost. Map data may not load.", 'error'); });
 window.addEventListener('online', () => {
     showError("Internet connection restored. Refreshing data...", 'warning');
-    setTimeout(() => { document.getElementById('errorOverride').style.display = 'none'; fetchAndRefreshData(); }, 2000);
+    setTimeout(() => { 
+        const errDiv = document.getElementById('errorOverride');
+        if (errDiv) errDiv.style.display = 'none'; 
+        fetchAndRefreshData(); 
+    }, 2000);
 });
 
 // ==========================================
@@ -87,7 +91,7 @@ window.showImage = function(src, alt) {
     modalImg.onload = function() { modal.style.display = "block"; captionText.innerHTML = alt || "Image View"; };
     modalImg.onerror = function() { showError("Failed to load image high-resolution view.", 'warning'); modal.style.display = "none"; };
     modalImg.src = src;
-}
+};
 
 setTimeout(hideLoadingScreen, 15000); 
 
@@ -111,7 +115,7 @@ function updateClock() {
 }
 setInterval(updateClock, 1000); updateClock(); 
 
-function Homebutton() { window.location.href = 'https://ligtas.uplb.edu.ph/LIGTAS-AGAD_new_portal-main/';  }
+function Homebutton() { window.location.href = 'https://ligtas.uplb.edu.ph/LIGTAS-AGAD_new_portal-main/'; }
 
 function formatPropertyName(key) {
     if (!key) return 'Unknown';
@@ -182,11 +186,10 @@ try {
     map.getPane('maskOverlayPane').style.zIndex = 390; 
     map.getPane('maskOverlayPane').style.pointerEvents = 'none';
 
-// Protected pane for LIGTAS Sites so they stay on top
+    // Protected pane for LIGTAS Sites so they stay on top
     map.createPane('siteBoundaries');
     map.getPane('siteBoundaries').style.zIndex = 460;
-    map.getPane('siteBoundaries').style.pointerEvents = 'none'; // Lets clicks pass through to data below
-    // ---------------------------
+    map.getPane('siteBoundaries').style.pointerEvents = 'none';
 
     // --- BASE LAYERS CONFIGURATION ---
     baseLayersData = {
@@ -357,8 +360,9 @@ const layerData = [
     { name: 'Red buffer', desc: 'Warning Level 3 (20km)', color: 'red' }
 ];
 
+// Fixed Typo in index 0 URL ("githubusercontent.comz" -> "githubusercontent.com")
 const layerLogos = [
-    'https://raw.githubusercontent.comz/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/Landslide-icon.png', 
+    'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/Landslide-icon.png', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/logo3.png', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/logo3.png', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/logo3.png', 
@@ -476,16 +480,15 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
         .then(data => {
             if (name === 'LIGTAS-LSDB') landslideFeatures = data.features || [];
 
-const layer = L.geoJSON(data, {
+            const layer = L.geoJSON(data, {
                 style: styleOptions,
                 pane: styleOptions.pane || 'overlayPane',
-                interactive: styleOptions.interactive !== false, // <-- NEW: Disables click capture if false
+                interactive: styleOptions.interactive !== false,
                 pointToLayer: (feature, latlng) => {
                     if (iconUrl) { return L.marker(latlng, { icon: L.icon({ iconUrl: iconUrl, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -12] }) }); } 
                     else { return L.circleMarker(latlng, { color: styleOptions.color || 'blue', fillColor: styleOptions.fillColor || styleOptions.color || 'blue', fillOpacity: styleOptions.fillOpacity || 0.8, radius: styleOptions.radius || 6, weight: styleOptions.weight || 1 }); }
                 },
                 onEachFeature: (feature, layer) => {
-                    // --- NEW: Skip building the popup if the layer isn't interactive ---
                     if (styleOptions.interactive === false) return; 
 
                     let popupRows = '';
@@ -535,12 +538,12 @@ const layer = L.geoJSON(data, {
 }
 
 const layerPromises = [
-createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, pane: 'markerPane'}, null),
+    createGeoJSONLayer('LIGTAS-LSDB', 'Recorded Landslides', 'https://raw.githubusercontent.com/Gabzrock/LIGTAS-AGAD/refs/heads/main/LandslideDB-web.geojson', { color: 'orange', fillColor: 'orange', fillOpacity: 0.8, radius: 6, weight: 1, pane: 'markerPane'}, null),
     createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.6, weight: 1, customPopupName: 'High Landslide Risk Area' }),
     createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
     createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 }),
-createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.0, weight: 0.5, interactive: false },null),
-createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'white', fillOpacity: 0.0, weight: 0.5, pane: 'siteBoundaries', interactive: false })
+    createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.0, weight: 0.5, interactive: false },null),
+    createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'white', fillOpacity: 0.0, weight: 0.5, pane: 'siteBoundaries', interactive: false })
 ];
 
 // --- BUILD INVERTED MASK FOR FOCUS MODE ---
@@ -575,19 +578,15 @@ fetch('https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/mai
             interactive: false
         });
 
-        // --- NEW: AUTO-ENABLE MASK ON LOAD ---
-        // We wait 1 second to ensure all UI elements and slider listeners are fully loaded, 
-        // then we simulate a click on the button to turn Focus Mode on.
         setTimeout(() => {
             const autoToggleBtn = document.getElementById('toggleMaskBtn');
             if (autoToggleBtn && !autoToggleBtn.classList.contains('btn-active')) {
                 autoToggleBtn.click();
             }
         }, 1000); 
-        // -------------------------------------
     })
     .catch(err => console.error("Error building mask:", err));
-// ------------------------------------------
+
 // ==========================================
 // 5. SYNCHRONIZED AWS GEOJSON LAYERS
 // ==========================================
@@ -612,12 +611,19 @@ L.Control.SyncPanel = L.Control.extend({
 
 if (map) { new L.Control.SyncPanel({ position: 'topright' }).addTo(map); }
 
+// UPDATED: Borderline added via explicit stroke styling (color, weight, opacity)
 function initSynchronizedAWSLayer(targetAwsName, geojsonUrl, layerDisplayName) {
     return fetch(geojsonUrl)
         .then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); })
         .then(data => {
             const layer = L.geoJSON(data, {
-                style: { color: '#808080', weight: 1, opacity: globalLayerOpacity, fillOpacity: globalLayerOpacity }, 
+                style: { 
+                    color: '#2c3e50',      // Borderline color to visually separate GeoJSON boundaries
+                    weight: 1.5,           // Borderline stroke width
+                    opacity: 0.9,          // Borderline stroke opacity
+                    fillColor: '#808080',  // Base fill color prior to sync
+                    fillOpacity: globalLayerOpacity 
+                }, 
                 onEachFeature: (feature, layer) => { layer.bindPopup(`<b>${layerDisplayName}</b><br>Awaiting AWS synchronization...`); }
             }).addTo(map);
 
@@ -652,10 +658,10 @@ const awsSyncPromises = [
     initSynchronizedAWSLayer('Tanay, Rizal AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Tanay%20Rizal%20AWS_RIL_HL.geojson', 'PAGASA-Tanay, Rizal AWS'),
     initSynchronizedAWSLayer('Sorsogon, Sorsogon AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Sorsogon%20Sorsogon%20AWS_RIL_HL.geojson', 'PAGASA-Sorsogon, Sorsogon AWS'),
     initSynchronizedAWSLayer('Virac, Catanduanes AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/Virac%20Catanduanes%20AWS_RIL_HL.geojson', 'PAGASA-Virac, Catanduanes AWS'),
-      initSynchronizedAWSLayer('LIGTAS-AGAD PASIL AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Pasil%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD PASIL AWS'),
-      initSynchronizedAWSLayer('LIGTAS-AGAD Licuan-Baay AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Licuan%20Baay%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Licuan-Baay AWS'),
-        initSynchronizedAWSLayer('LIGTAS-AGAD Calanasan AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Calanasan%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Calanasan AWS'),
-          initSynchronizedAWSLayer('LIGTAS-AGAD Barlig AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Barlig%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Barlig AWS')
+    initSynchronizedAWSLayer('LIGTAS-AGAD PASIL AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Pasil%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD PASIL AWS'),
+    initSynchronizedAWSLayer('LIGTAS-AGAD Licuan-Baay AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Licuan%20Baay%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Licuan-Baay AWS'),
+    initSynchronizedAWSLayer('LIGTAS-AGAD Calanasan AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Calanasan%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Calanasan AWS'),
+    initSynchronizedAWSLayer('LIGTAS-AGAD Barlig AWS', 'https://raw.githubusercontent.com/LIGTAS-AGAD/LIGTAS/refs/heads/main/LIGTAS_Barlig%20AWS_RIL_HL.geojson', 'LIGTAS-AGAD Barlig AWS')
 ];
 
 Promise.allSettled(awsSyncPromises).then(() => {
@@ -672,6 +678,7 @@ Promise.allSettled(awsSyncPromises).then(() => {
     }
 });
 
+// UPDATED: Borderline preserved during live weather status updates
 function syncAwsLayersWithData() {
     if (!cachedAWSData || cachedAWSData.length === 0) return;
     
@@ -703,7 +710,14 @@ function syncAwsLayersWithData() {
             else if (warningLevel === 3) targetColor = 'red'; 
             else if (warningLevel === 0 || rawLevel === '0') targetColor = 'transparent'; 
             
-            layerData.layer.setStyle({ color: targetColor, fillColor: targetColor, fillOpacity: globalLayerOpacity, weight: 0.6, opacity: globalLayerOpacity });
+            // stroke color '#2c3e50' retained to separate neighboring polygon boundaries
+            layerData.layer.setStyle({ 
+                color: '#2c3e50',                // Distinct border color line
+                fillColor: targetColor,          // Dynamic fill color according to warning level
+                fillOpacity: globalLayerOpacity, 
+                weight: 1.5,                     // Distinct borderline thickness
+                opacity: 0.9                     // High stroke opacity
+            });
             layerData.currentLevel = warningLevel;
             
             layerData.layer.eachLayer(featureLayer => {
@@ -775,12 +789,10 @@ Promise.allSettled(layerPromises).then((results) => {
     const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === null));
     if (failed.length > 0) { showError(`${failed.length} layers failed to load. Check network.`, 'warning'); }
 
-    // --- NEW: AUTO-LOAD PH BOUNDARY ON STARTUP ---
     const phBoundaryLayer = overlays['PH-Boundary: Boundary'];
     if (phBoundaryLayer && !map.hasLayer(phBoundaryLayer)) {
         map.addLayer(phBoundaryLayer);
     }
-    // ---------------------------------------------
 
     try { initSidebarControls(); } catch (e) { console.error("Error setting default layers", e); }
 });
@@ -793,7 +805,11 @@ if (opacitySlider && opacityValue) {
         globalLayerOpacity = this.value / 100;
         opacityValue.innerHTML = this.value + "%";
         synchronizedLayers.forEach(layerData => {
-            if (layerData.layer) { layerData.layer.setStyle({ opacity: globalLayerOpacity, fillOpacity: globalLayerOpacity }); }
+            if (layerData.layer) { 
+                layerData.layer.setStyle({ 
+                    fillOpacity: globalLayerOpacity 
+                }); 
+            }
         });
     };
 }
@@ -818,6 +834,7 @@ if (baseMapOpacitySlider && baseMapOpacityValue) {
         });
     };
 }
+
 // --- BOUNDARY STYLE CONTROLS LOGIC ---
 const phBoundaryColor = document.getElementById('phBoundaryColor');
 const phBoundaryOpacitySlider = document.getElementById('phBoundaryOpacitySlider');
@@ -827,7 +844,6 @@ const ligtasSitesColor = document.getElementById('ligtasSitesColor');
 const ligtasSitesOpacitySlider = document.getElementById('ligtasSitesOpacitySlider');
 const ligtasSitesOpacityValue = document.getElementById('ligtasSitesOpacityValue');
 
-// Helper function to update color and opacity dynamically
 function updateBoundaryStyle(layerName, colorInput, opacityInput, opacityText) {
     const layer = overlays[layerName];
     if (layer) {
@@ -836,15 +852,14 @@ function updateBoundaryStyle(layerName, colorInput, opacityInput, opacityText) {
         if (opacityText) opacityText.innerHTML = opacityInput.value + "%";
         
         layer.setStyle({
-            color: newColor,       // Updates the border line color
-            fillColor: newColor,   // Updates the inside fill color
+            color: newColor,
+            fillColor: newColor,
             fillOpacity: newOpacity,
-            weight: 0.2            // Keeps the thin boundary line weight
+            weight: 0.2
         });
     }
 }
 
-// Attach event listeners so it updates in real-time as the user drags/clicks
 if (phBoundaryColor && phBoundaryOpacitySlider) {
     phBoundaryColor.addEventListener('input', () => updateBoundaryStyle('PH-Boundary: Boundary', phBoundaryColor, phBoundaryOpacitySlider, phBoundaryOpacityValue));
     phBoundaryOpacitySlider.addEventListener('input', () => updateBoundaryStyle('PH-Boundary: Boundary', phBoundaryColor, phBoundaryOpacitySlider, phBoundaryOpacityValue));
@@ -854,7 +869,7 @@ if (ligtasSitesColor && ligtasSitesOpacitySlider) {
     ligtasSitesColor.addEventListener('input', () => updateBoundaryStyle('LIGTAS-AGAD sites: Boundary', ligtasSitesColor, ligtasSitesOpacitySlider, ligtasSitesOpacityValue));
     ligtasSitesOpacitySlider.addEventListener('input', () => updateBoundaryStyle('LIGTAS-AGAD sites: Boundary', ligtasSitesColor, ligtasSitesOpacitySlider, ligtasSitesOpacityValue));
 }
-// -------------------------------------
+
 // ==========================================
 // 7. DATA FETCHING & PROCESSING
 // ==========================================
@@ -983,19 +998,19 @@ function processAWSData(data) {
     updateAlertTicker();
 }
 
+// Fixed empty fetch call to parse Google Sheets directly via PapaParse
 function fetchAndRefreshData() {
-    fetch('')
-        .then(response => { if (!response.ok) throw new Error("Fetch failed"); return response.json(); })
-        .then(data => { processAWSData(data); })
-        .catch(error => { 
-            if (typeof Papa !== 'undefined') {
-                Papa.parse(googleSheetCSV, {
-                    download: true, header: true, skipEmptyLines: true,
-                    complete: function(results) { processAWSData(results.data); },
-                    error: function(err) { showError("Data connection lost. Retrying...", 'warning'); }
-                });
-            } else { showError("Critical library missing: PapaParse.", 'error'); }
+    if (typeof Papa !== 'undefined') {
+        Papa.parse(googleSheetCSV, {
+            download: true, 
+            header: true, 
+            skipEmptyLines: true,
+            complete: function(results) { processAWSData(results.data); },
+            error: function(err) { showError("Data connection lost. Retrying...", 'warning'); }
         });
+    } else { 
+        showError("Critical library missing: PapaParse.", 'error'); 
+    }
 }
 fetchAndRefreshData(); setInterval(fetchAndRefreshData, 60000);
 
@@ -1004,7 +1019,7 @@ fetchAndRefreshData(); setInterval(fetchAndRefreshData, 60000);
 // ==========================================
 
 const geojsonUrls = [
-'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_007-012_Bin5_50-100.geojson'
+    'https://raw.githubusercontent.com/LIGTAS-AGAD/upgraded-octo-pancake/refs/heads/main/6hr_Hours_007-012_Bin5_50-100.geojson'
 ];
 const colors = ['yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow'];
 const rasterForecastUrls = [
@@ -1022,7 +1037,7 @@ if (slider && output) {
     slider.oninput = function() {
         speed = this.value * 1000; output.innerHTML = this.value + "s";
         if(isPlaying) { clearInterval(animationInterval); startAnimation(); }
-    }
+    };
 }
 
 function updateRaster(index) {
@@ -1204,34 +1219,27 @@ if (defaultLayersBtn) {
 }
 
 // --- MASK MAP TOGGLE LOGIC ---
-// --- MASK MAP TOGGLE LOGIC ---
 let preMaskSusOpacity = 30; // Memory for Susceptibility slider
 let preMaskBaseOpacity = 50; // Memory for Base Map slider
 
 const toggleMaskBtn = document.getElementById('toggleMaskBtn');
 if (toggleMaskBtn) {
     toggleMaskBtn.addEventListener('click', () => {
-        // Grab the current state and slider elements
         const isCurrentlyMasked = toggleMaskBtn.classList.contains('btn-active');
         const susSlider = document.getElementById('opacitySlider');
         const baseSlider = document.getElementById('baseMapOpacitySlider');
 
         if (!isCurrentlyMasked) {
-            // =========================
-            // 1. TURN ON MASK
-            // =========================
             toggleMaskBtn.innerText = '👁️ Unmask Map';
             toggleMaskBtn.classList.remove('btn-warning');
             toggleMaskBtn.classList.add('btn-active');
             
-            // Add the inverted polygon mask
             if (invertedMaskLayer) {
                 const isDark = document.body.classList.contains('dark-mode');
                 invertedMaskLayer.setStyle({ fillColor: isDark ? '#121212' : '#ffffff', fillOpacity: 0.85 });
                 map.addLayer(invertedMaskLayer);
             }
 
-            // Auto-enable LIGTAS boundaries if they were turned off
             const sitesLayerName = Object.keys(overlays).find(name => name.includes('LIGTAS-AGAD sites'));
             if (sitesLayerName && overlays[sitesLayerName] && !map.hasLayer(overlays[sitesLayerName])) {
                 map.addLayer(overlays[sitesLayerName]);
@@ -1242,13 +1250,10 @@ if (toggleMaskBtn) {
                 });
             }
 
-            // Automate sliders for Focus Mode
             if (susSlider && baseSlider) {
-                // Save the user's current settings before overriding
                 preMaskSusOpacity = susSlider.value;
                 preMaskBaseOpacity = baseSlider.value;
                 
-                // Set to 100% and 5% and trigger the visual updates
                 susSlider.value = 100;
                 susSlider.oninput();
                 
@@ -1257,17 +1262,12 @@ if (toggleMaskBtn) {
             }
 
         } else {
-            // =========================
-            // 2. TURN OFF MASK
-            // =========================
             toggleMaskBtn.innerText = '👁️ Mask Map';
             toggleMaskBtn.classList.add('btn-warning');
             toggleMaskBtn.classList.remove('btn-active');
             
-            // Remove the inverted polygon mask
             if (invertedMaskLayer) map.removeLayer(invertedMaskLayer);
 
-            // Revert sliders back to defaults / previous state
             if (susSlider && baseSlider) {
                 susSlider.value = preMaskSusOpacity;
                 susSlider.oninput();
@@ -1278,7 +1278,6 @@ if (toggleMaskBtn) {
         }
     });
 }
-// -----------------------------
 
 // ==========================================
 // 10. HAMBURGER MENU LOGIC
@@ -1304,7 +1303,6 @@ if (hamburgerBtn && subheaderMenu) {
 
     if (typeof map !== 'undefined') { map.on('click dragstart zoomstart', function() { subheaderMenu.classList.remove('show-menu'); }); }
 }
-
 
 // ==========================================
 // 11. ALL STATIONS RAINFALL GRAPH & ADVISORIES 
@@ -1804,17 +1802,16 @@ function checkAndTriggerMobileNotification(station) {
         }
     }
 }
+
 // =========================================================
 // 15. CUSTOM GEOJSON LOADER (FILE & URL) - 10MB LIMIT
 // =========================================================
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
-// Helper to draw the custom data on the map
 function addCustomGeojsonToMap(data, layerName, colorHex) {
     try {
         const layer = L.geoJSON(data, {
-            // Apply the user's chosen color here
             style: { color: colorHex, weight: 2, fillOpacity: 0.3, fillColor: colorHex },
             pointToLayer: (feature, latlng) => {
                 return L.circleMarker(latlng, { radius: 6, color: colorHex, fillColor: colorHex, fillOpacity: 0.8, weight: 1 });
@@ -1841,7 +1838,6 @@ function addCustomGeojsonToMap(data, layerName, colorHex) {
 
         if (layer.getLayers().length === 0) throw new Error("No valid map features found in file.");
 
-        // Add to map and register to global lists
         layer.addTo(map);
         const finalName = `Custom: ${layerName}`;
         overlays[finalName] = layer;
@@ -1871,7 +1867,6 @@ if (customFileInput) {
             return;
         }
 
-        // Get the chosen color
         const colorInput = document.getElementById('customGeojsonColor');
         const chosenColor = colorInput ? colorInput.value : '#9b59b6';
 
@@ -1901,7 +1896,6 @@ if (loadCustomUrlBtn && customGeojsonUrl) {
         loadCustomUrlBtn.innerText = "⏳...";
         loadCustomUrlBtn.disabled = true;
 
-        // Get the chosen color
         const colorInput = document.getElementById('customGeojsonColor');
         const chosenColor = colorInput ? colorInput.value : '#9b59b6';
 
@@ -1932,6 +1926,7 @@ if (loadCustomUrlBtn && customGeojsonUrl) {
             });
     });
 }
+
 // =========================================================
 // 16. KMZ EXPORT FEATURE (BUG FIX & DATA SANITIZATION)
 // =========================================================
@@ -1939,7 +1934,6 @@ if (loadCustomUrlBtn && customGeojsonUrl) {
 const exportKmlBtn = document.getElementById('exportKmlBtn');
 if (exportKmlBtn) {
     exportKmlBtn.addEventListener('click', () => {
-        // Check if BOTH libraries loaded properly
         if (typeof tokml === 'undefined' || typeof JSZip === 'undefined') {
             showError("Export libraries not loaded. Please wait a moment or check your internet connection.", "error");
             return;
@@ -1952,15 +1946,13 @@ if (exportKmlBtn) {
         try {
             let allFeatures = [];
 
-            // --- DEFENSIVE DATA SANITIZER ---
             function addSafeFeature(f, layerName) {
                 if (!f || !f.geometry || !f.geometry.type || !f.geometry.coordinates) return;
                 if (Array.isArray(f.geometry.coordinates) && f.geometry.coordinates.length === 0) return;
 
                 if (!f.properties) f.properties = {};
-                f.properties.LayerName = layerName; // Folders in Google Earth
+                f.properties.LayerName = layerName;
 
-                // Flatten nested objects/arrays in properties 
                 for (let key in f.properties) {
                     if (typeof f.properties[key] === 'object' && f.properties[key] !== null) {
                         try {
@@ -1972,9 +1964,8 @@ if (exportKmlBtn) {
                 }
                 allFeatures.push(f);
             }
-            // -----------------------------------------
 
-            // 1. Extract features from all standard Overlays & Custom Uploads
+            // 1. Extract standard Overlays
             Object.keys(overlays).forEach(name => {
                 const layer = overlays[name];
                 if (map.hasLayer(layer) && typeof layer.toGeoJSON === 'function') {
@@ -1987,7 +1978,7 @@ if (exportKmlBtn) {
                 }
             });
 
-            // 2. Extract features from the AWS Warning Buffers & Markers
+            // 2. Extract Warning Buffers
             if (typeof warningLayerGroup !== 'undefined' && map.hasLayer(warningLayerGroup)) {
                 warningLayerGroup.eachLayer(layer => {
                     if (typeof layer.toGeoJSON === 'function') {
@@ -2001,14 +1992,11 @@ if (exportKmlBtn) {
                 });
             }
 
-            // 3. Extract user-drawn shapes (My Drawings)
+            // 3. Extract Drawings
             if (typeof drawnItems !== 'undefined' && map.hasLayer(drawnItems)) {
                 drawnItems.eachLayer(layer => {
                     if (typeof layer.toGeoJSON === 'function') {
                         const geojson = layer.toGeoJSON();
-                        
-                        // Note: Leaflet Draw Circles natively export to GeoJSON as just a Point (the center).
-                        // Polygons, Rectangles, Lines, and Markers export perfectly.
                         if (geojson.type === "FeatureCollection") {
                             geojson.features.forEach(f => addSafeFeature(f, "My Drawings"));
                         } else {
@@ -2027,7 +2015,6 @@ if (exportKmlBtn) {
 
             const combinedGeoJSON = { type: "FeatureCollection", features: allFeatures };
 
-            // --- CONVERT TO KML ---
             exportKmlBtn.innerText = "⏳ Converting to KML...";
             let kmlString = "";
             
@@ -2042,7 +2029,6 @@ if (exportKmlBtn) {
                 throw new Error("Failed to convert map data. Check the console for invalid shape details.");
             }
 
-            // --- COMPRESS INTO KMZ ---
             exportKmlBtn.innerText = "⏳ Compressing KMZ...";
             const zip = new JSZip();
             zip.file("doc.kml", kmlString); 
@@ -2081,6 +2067,7 @@ if (exportKmlBtn) {
         }
     });
 }
+
 // =========================================================
 // 17. EXPORT & IMPORT WORKSPACE SETTINGS (.TXT / JSON)
 // =========================================================
@@ -2088,11 +2075,9 @@ if (exportKmlBtn) {
 const exportSettingsBtn = document.getElementById('exportSettingsBtn');
 const importSettingsFile = document.getElementById('importSettingsFile');
 
-// --- 1. EXPORT SETTINGS LOGIC ---
 if (exportSettingsBtn) {
     exportSettingsBtn.addEventListener('click', () => {
         try {
-            // Determine active base map name
             let activeBaseMap = "Streets";
             if (typeof baseLayersData !== 'undefined') {
                 for (const [name, layer] of Object.entries(baseLayersData)) {
@@ -2103,15 +2088,13 @@ if (exportSettingsBtn) {
                 }
             }
 
-            // Collect checkboxes states from the sidebar
             const layerToggleStates = {};
             document.querySelectorAll('.layer-toggle-input').forEach(input => {
                 if (input.id) {
                     layerToggleStates[input.id] = input.checked;
                 }
             });
-//PH-Boundary Opacity & LIGTAS Sites Opacity configuration
-            // Build Settings Bundle
+
             const settingsBundle = {
                 version: "2.4",
                 timestamp: new Date().toISOString(),
@@ -2136,7 +2119,6 @@ if (exportSettingsBtn) {
                 layers: layerToggleStates
             };
 
-            // Convert to formatted string and trigger download
             const dataStr = JSON.stringify(settingsBundle, null, 2);
             const blob = new Blob([dataStr], { type: "text/plain;charset=utf-8" });
             const url = URL.createObjectURL(blob);
@@ -2158,7 +2140,6 @@ if (exportSettingsBtn) {
     });
 }
 
-// --- 2. IMPORT SETTINGS LOGIC ---
 if (importSettingsFile) {
     importSettingsFile.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -2173,7 +2154,6 @@ if (importSettingsFile) {
                     throw new Error("Invalid format. Missing required settings structures.");
                 }
 
-                // A. Restore Map Viewport & Basemap
                 if (settings.mapState.center && settings.mapState.zoom) {
                     map.setView([settings.mapState.center.lat, settings.mapState.center.lng], settings.mapState.zoom);
                 }
@@ -2182,7 +2162,6 @@ if (importSettingsFile) {
                     map.addLayer(baseLayersData[settings.mapState.baseMap]);
                 }
 
-                // B. Restore Themes (Dark Mode & Visual Effects)
                 if (typeof enableDarkMode === 'function' && settings.themeState) {
                     enableDarkMode(settings.themeState.darkMode);
                     localStorage.setItem('ligtas-dark-mode', settings.themeState.darkMode);
@@ -2195,7 +2174,6 @@ if (importSettingsFile) {
                     }
                 }
 
-                // C. Restore Sliders
                 const s = settings.sliders;
                 const triggerInput = (el, val) => {
                     if (el) { el.value = val; el.dispatchEvent(new Event('input')); }
@@ -2208,7 +2186,6 @@ if (importSettingsFile) {
                 triggerInput(document.getElementById('ligtasSitesColor'), s.ligtasSitesColor);
                 triggerInput(document.getElementById('ligtasSitesOpacitySlider'), s.ligtasSitesOpacity);
 
-                // D. Restore Focus Mask Mode
                 const maskBtn = document.getElementById('toggleMaskBtn');
                 if (maskBtn && settings.themeState && typeof settings.themeState.isMasked !== 'undefined') {
                     const isCurrentlyMasked = maskBtn.classList.contains('btn-active');
@@ -2217,18 +2194,17 @@ if (importSettingsFile) {
                     }
                 }
 
-                // E. Restore Layer Control Checkboxes & Visibilities
                 if (settings.layers) {
                     for (const [id, shouldBeChecked] of Object.entries(settings.layers)) {
                         const cb = document.getElementById(id);
                         if (cb && cb.checked !== shouldBeChecked) {
-                            cb.click(); // Using click() natively toggles the Leaflet layer and UI syncs
+                            cb.click();
                         }
                     }
                 }
 
                 showError("Workspace settings imported and restored successfully!", "warning");
-                importSettingsFile.value = ""; // Reset input so same file can be loaded again if needed
+                importSettingsFile.value = "";
                 
             } catch (err) {
                 console.error("Import Settings Error:", err);
