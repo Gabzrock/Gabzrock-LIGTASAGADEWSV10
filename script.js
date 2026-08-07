@@ -165,6 +165,59 @@ function updatePropertiesTable(layerName, properties) {
 }
 
 // ==========================================
+// 2B. GEOJSON HIGHLIGHT EFFECT LOGIC
+// ==========================================
+let activeSelectedLayer = null;
+
+function highlightGeoJSONFeature(targetLayer) {
+    if (!targetLayer || typeof targetLayer.setStyle !== 'function') return;
+
+    // Reset style of previously clicked layer
+    resetGeoJSONHighlight();
+
+    // Cache current original style parameters
+    if (!targetLayer._originalStyle) {
+        targetLayer._originalStyle = {
+            color: targetLayer.options.color || '#2c3e50',
+            weight: targetLayer.options.weight || 1,
+            fillColor: targetLayer.options.fillColor || targetLayer.options.color,
+            fillOpacity: targetLayer.options.fillOpacity || globalLayerOpacity,
+            opacity: targetLayer.options.opacity || 0.9
+        };
+    }
+
+    // Apply Highlight Style for selected Barangay/Polygon
+    targetLayer.setStyle({
+        weight: 3.5,
+        color: '#FFD700',      // Vivid Yellow Border Outline
+        fillColor: '#FF5722',  // Accent highlight fill color
+        fillOpacity: 0.75,
+        opacity: 1.0
+    });
+
+    if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+        targetLayer.bringToFront();
+    }
+
+    activeSelectedLayer = targetLayer;
+}
+
+function resetGeoJSONHighlight() {
+    if (activeSelectedLayer && activeSelectedLayer.setStyle) {
+        if (activeSelectedLayer._originalStyle) {
+            activeSelectedLayer.setStyle(activeSelectedLayer._originalStyle);
+        } else {
+            activeSelectedLayer.setStyle({
+                weight: 1.5,
+                color: '#2c3e50',
+                fillOpacity: globalLayerOpacity
+            });
+        }
+        activeSelectedLayer = null;
+    }
+}
+
+// ==========================================
 // 3. MAP INITIALIZATION & DRAWING CONTROLS
 // ==========================================
 
@@ -190,6 +243,13 @@ try {
     map.createPane('siteBoundaries');
     map.getPane('siteBoundaries').style.zIndex = 460;
     map.getPane('siteBoundaries').style.pointerEvents = 'none';
+
+    // Reset GeoJSON Highlight when map canvas is clicked directly
+    map.on('click', (e) => {
+        if (e.originalEvent && !e.originalEvent._stopped) {
+            resetGeoJSONHighlight();
+        }
+    });
 
     // --- BASE LAYERS CONFIGURATION ---
     baseLayersData = {
@@ -360,7 +420,6 @@ const layerData = [
     { name: 'Red buffer', desc: 'Warning Level 3 (20km)', color: 'red' }
 ];
 
-// Fixed Typo in index 0 URL ("githubusercontent.comz" -> "githubusercontent.com")
 const layerLogos = [
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/Landslide-icon.png', 
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/logo3.png', 
@@ -519,6 +578,11 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
                     
                     layer.bindPopup(popupContent);
                     layer.on('click', (e) => { 
+                        if (e.originalEvent) e.originalEvent._stopped = true;
+                        
+                        // Highlight selected Barangay / Feature boundary polygon
+                        highlightGeoJSONFeature(e.target);
+
                         updatePropertiesTable(displayTitle, feature.properties);
                         if (name.includes('MGB') || name.includes('Susceptibility')) {
                             const priorityStation = findPriorityStationNearby(e.latlng, 20); 
@@ -611,20 +675,25 @@ L.Control.SyncPanel = L.Control.extend({
 
 if (map) { new L.Control.SyncPanel({ position: 'topright' }).addTo(map); }
 
-// UPDATED: Borderline added via explicit stroke styling (color, weight, opacity)
 function initSynchronizedAWSLayer(targetAwsName, geojsonUrl, layerDisplayName) {
     return fetch(geojsonUrl)
         .then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); })
         .then(data => {
             const layer = L.geoJSON(data, {
                 style: { 
-                    color: '#2c3e50',      // Borderline color to visually separate GeoJSON boundaries
-                    weight: 1.5,           // Borderline stroke width
-                    opacity: 0.9,          // Borderline stroke opacity
-                    fillColor: '#808080',  // Base fill color prior to sync
+                    color: '#2c3e50',      
+                    weight: 1.5,           
+                    opacity: 0.9,          
+                    fillColor: '#808080',  
                     fillOpacity: globalLayerOpacity 
                 }, 
-                onEachFeature: (feature, layer) => { layer.bindPopup(`<b>${layerDisplayName}</b><br>Awaiting AWS synchronization...`); }
+                onEachFeature: (feature, layer) => { 
+                    layer.bindPopup(`<b>${layerDisplayName}</b><br>Awaiting AWS synchronization...`); 
+                    layer.on('click', (e) => {
+                        if (e.originalEvent) e.originalEvent._stopped = true;
+                        highlightGeoJSONFeature(e.target);
+                    });
+                }
             }).addTo(map);
 
             synchronizedLayers.push({ targetAws: targetAwsName, layer: layer, name: layerDisplayName });
@@ -678,7 +747,6 @@ Promise.allSettled(awsSyncPromises).then(() => {
     }
 });
 
-// UPDATED: Borderline preserved during live weather status updates
 function syncAwsLayersWithData() {
     if (!cachedAWSData || cachedAWSData.length === 0) return;
     
@@ -710,13 +778,12 @@ function syncAwsLayersWithData() {
             else if (warningLevel === 3) targetColor = 'red'; 
             else if (warningLevel === 0 || rawLevel === '0') targetColor = 'transparent'; 
             
-            // stroke color '#2c3e50' retained to separate neighboring polygon boundaries
             layerData.layer.setStyle({ 
-                color: '#2c3e50',                // Distinct border color line
-                fillColor: targetColor,          // Dynamic fill color according to warning level
+                color: '#2c3e50',                
+                fillColor: targetColor,          
                 fillOpacity: globalLayerOpacity, 
-                weight: 1.5,                     // Distinct borderline thickness
-                opacity: 0.9                     // High stroke opacity
+                weight: 1.5,                     
+                opacity: 0.9                     
             });
             layerData.currentLevel = warningLevel;
             
@@ -797,7 +864,6 @@ Promise.allSettled(layerPromises).then((results) => {
     try { initSidebarControls(); } catch (e) { console.error("Error setting default layers", e); }
 });
 
-// --- SUSCEPTIBILITY OPACITY SLIDER LOGIC ---
 const opacitySlider = document.getElementById('opacitySlider');
 const opacityValue = document.getElementById('opacityValue');
 if (opacitySlider && opacityValue) {
@@ -814,8 +880,7 @@ if (opacitySlider && opacityValue) {
     };
 }
 
-// --- BASE MAP OPACITY SLIDER LOGIC ---
-let globalBaseMapOpacity = 0.5; // Default 50%
+let globalBaseMapOpacity = 0.5; 
 const baseMapOpacitySlider = document.getElementById('baseMapOpacitySlider');
 const baseMapOpacityValue = document.getElementById('baseMapOpacityValue');
 if (baseMapOpacitySlider && baseMapOpacityValue) {
@@ -835,7 +900,6 @@ if (baseMapOpacitySlider && baseMapOpacityValue) {
     };
 }
 
-// --- BOUNDARY STYLE CONTROLS LOGIC ---
 const phBoundaryColor = document.getElementById('phBoundaryColor');
 const phBoundaryOpacitySlider = document.getElementById('phBoundaryOpacitySlider');
 const phBoundaryOpacityValue = document.getElementById('phBoundaryOpacityValue');
@@ -998,7 +1062,6 @@ function processAWSData(data) {
     updateAlertTicker();
 }
 
-// Fixed empty fetch call to parse Google Sheets directly via PapaParse
 function fetchAndRefreshData() {
     if (typeof Papa !== 'undefined') {
         Papa.parse(googleSheetCSV, {
@@ -1219,8 +1282,8 @@ if (defaultLayersBtn) {
 }
 
 // --- MASK MAP TOGGLE LOGIC ---
-let preMaskSusOpacity = 30; // Memory for Susceptibility slider
-let preMaskBaseOpacity = 50; // Memory for Base Map slider
+let preMaskSusOpacity = 30; 
+let preMaskBaseOpacity = 50; 
 
 const toggleMaskBtn = document.getElementById('toggleMaskBtn');
 if (toggleMaskBtn) {
@@ -1712,6 +1775,52 @@ function syncAlertUiPermissionState() {
 }
 setTimeout(syncAlertUiPermissionState, 1000);
 
+function checkAndTriggerMobileNotification(nearestStation) {
+    if (!nearestStation || Notification.permission !== "granted") return;
+
+    const level = parseInt(nearestStation.RainfallLandslidethresholdwarninglevel) || 0;
+    const stationName = nearestStation.StationName || nearestStation.Station || 'Nearby AWS';
+
+    if (level >= 1 && (lastNotifiedStation !== stationName || lastNotifiedLevel !== level)) {
+        lastNotifiedStation = stationName;
+        lastNotifiedLevel = level;
+
+        const title = `⚠️ Landslide Warning Level ${level}`;
+        const options = {
+            body: `Station ${stationName} is currently at Level ${level}. Distance: ${nearestStation.distance || '20'}km. Take appropriate precautions.`,
+            icon: layerLogos[0] || '',
+            vibrate: [200, 100, 200]
+        };
+
+        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(title, options);
+            });
+        } else {
+            new Notification(title, options);
+        }
+    }
+}
+
+function startAutomatedAlerts() {
+    isWatchingAlerts = true;
+    if (toggleAutoAlertsBtn) {
+        toggleAutoAlertsBtn.innerText = "🔔 Tracking Active";
+        toggleAutoAlertsBtn.classList.add("btn-warning");
+    }
+    showError("Background Location Warning Tracking Enabled.", "warning");
+}
+
+function stopAutomatedAlerts() {
+    isWatchingAlerts = false;
+    lastNotifiedStation = "";
+    lastNotifiedLevel = -1;
+    if (toggleAutoAlertsBtn) {
+        toggleAutoAlertsBtn.innerText = "🔔 Enable Track Alerts";
+        toggleAutoAlertsBtn.classList.remove("btn-warning");
+    }
+}
+
 if (toggleAutoAlertsBtn) {
     toggleAutoAlertsBtn.onclick = function() {
         if (!isWatchingAlerts) {
@@ -1720,498 +1829,15 @@ if (toggleAutoAlertsBtn) {
                 return;
             }
             if (Notification.permission === "denied") {
-                issuePermissionRescueGuide();
+                showError("Notification permissions are blocked in browser settings.", "warning");
                 return;
             }
             Notification.requestPermission().then(permission => {
                 if (permission === "granted") { startAutomatedAlerts(); } 
-                else { issuePermissionRescueGuide(); }
+                else { showError("Notification permission denied.", "warning"); }
             });
         } else {
             stopAutomatedAlerts();
         }
     };
-}
-
-function issuePermissionRescueGuide() {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    let rescueMsg = "⚠️ ALERTS BLOCKED: Your browser is blocking LIGTAS notifications. ";
-    
-    if (isIOS) {
-        rescueMsg += "On iPhones, you must tap 'Share' [↑], select 'Add to Home Screen', and launch LIGTAS directly from your home screen to allow alerts.";
-    } else {
-        rescueMsg += "To resolve: Click the 'Site Info' icon (the two small slider switches) directly to the left of the URL address bar above, toggle Notifications to ALLOW, and refresh.";
-    }
-    showError(rescueMsg, "error");
-    if(toggleAutoAlertsBtn) toggleAutoAlertsBtn.innerText = "⚠️ Alerts Blocked";
-}
-
-function startAutomatedAlerts() {
-    isWatchingAlerts = true;
-    toggleAutoAlertsBtn.innerText = "🔕 Disable Track Alerts";
-    toggleAutoAlertsBtn.classList.add('btn-active');
-    showError("Automated tracking active. Monitoring nearest AWS 20km baseline thresholds...", "warning");
-    map.locate({ watch: true, setView: false, enableHighAccuracy: true, timeout: 20000 });
-}
-
-function stopAutomatedAlerts() {
-    isWatchingAlerts = false;
-    lastNotifiedStation = "";
-    lastNotifiedLevel = -1;
-    toggleAutoAlertsBtn.innerText = "🔔 Enable Track Alerts";
-    toggleAutoAlertsBtn.classList.remove('btn-active');
-    map.stopLocate();
-    showError("Automated tracking alerts successfully disabled.", "warning");
-}
-
-function checkAndTriggerMobileNotification(station) {
-    if (!station) return;
-    
-    const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
-    const stationId = station.StationName || station.Station || "Unknown AWS";
-    const recommendation = station.Recommendedactions || "Continue regular observation and local tracking.";
-    
-    if (level >= 1) {
-        if (lastNotifiedStation === stationId && lastNotifiedLevel === level) return;
-        
-        lastNotifiedStation = stationId;
-        lastNotifiedLevel = level;
-        
-        const title = `⚠️ AWS ALERT: Warning Level ${level}`;
-        const body = `Nearest AWS: ${stationId} (${station.distance} km away)\n\nRecommendation:\n${recommendation}`;
-        
-        if (Notification.permission === "granted") {
-            new Notification(title, {
-                body: body,
-                icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
-                vibrate: [300, 100, 300, 100, 400], 
-                tag: 'ligtas-weather-alert',
-                renotify: true
-            });
-        }
-    } else {
-        if (lastNotifiedStation === stationId && lastNotifiedLevel > 0) {
-            lastNotifiedLevel = 0;
-            if (Notification.permission === "granted") {
-                new Notification("✅ Nearest AWS Status: No Warning", {
-                    body: `Monitoring station (${stationId}) has dropped back down to clear safety baselines.\n\nRecommendation:\n${recommendation}`,
-                    icon: 'https://ligtas.uplb.edu.ph/wp-content/uploads/2022/04/3-e1659971771933.png',
-                    tag: 'ligtas-weather-alert'
-                });
-            }
-        }
-    }
-}
-
-// =========================================================
-// 15. CUSTOM GEOJSON LOADER (FILE & URL) - 10MB LIMIT
-// =========================================================
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
-
-function addCustomGeojsonToMap(data, layerName, colorHex) {
-    try {
-        const layer = L.geoJSON(data, {
-            style: { color: colorHex, weight: 2, fillOpacity: 0.3, fillColor: colorHex },
-            pointToLayer: (feature, latlng) => {
-                return L.circleMarker(latlng, { radius: 6, color: colorHex, fillColor: colorHex, fillOpacity: 0.8, weight: 1 });
-            },
-            onEachFeature: (feature, layer) => {
-                let popupRows = '';
-                if (feature.properties) {
-                    for (const [key, value] of Object.entries(feature.properties)) {
-                        popupRows += `<tr><th style="width:40%;">${key}</th><td>${value}</td></tr>`;
-                    }
-                }
-                const popupContent = `
-                    <div class="popup-container">
-                        <div class="popup-header" style="background-color: ${colorHex};">${layerName}</div>
-                        <div class="popup-scroll-container">
-                            <table class="popup-table">${popupRows || '<tr><td>No properties available.</td></tr>'}</table>
-                        </div>
-                    </div>
-                `;
-                layer.bindPopup(popupContent);
-                layer.on('click', () => { updatePropertiesTable(`Custom: ${layerName}`, feature.properties || {}); });
-            }
-        });
-
-        if (layer.getLayers().length === 0) throw new Error("No valid map features found in file.");
-
-        layer.addTo(map);
-        const finalName = `Custom: ${layerName}`;
-        overlays[finalName] = layer;
-        
-        if (layerControl) { layerControl.addOverlay(layer, finalName); }
-        if (typeof initSidebarControls === 'function') { initSidebarControls(); }
-        
-        map.fitBounds(layer.getBounds());
-        showError(`Successfully loaded: ${layerName}`, "warning"); 
-        
-    } catch (err) {
-        console.error(err);
-        showError("Failed to render GeoJSON. File may be corrupted or incorrectly formatted.", "error");
-    }
-}
-
-// 1. Handle Local File Upload
-const customFileInput = document.getElementById('customGeojsonFile');
-if (customFileInput) {
-    customFileInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (file.size > MAX_FILE_SIZE) {
-            showError("File exceeds the maximum 10MB limit.", "error");
-            customFileInput.value = "";
-            return;
-        }
-
-        const colorInput = document.getElementById('customGeojsonColor');
-        const chosenColor = colorInput ? colorInput.value : '#9b59b6';
-
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            try {
-                const geojsonData = JSON.parse(event.target.result);
-                addCustomGeojsonToMap(geojsonData, file.name, chosenColor);
-            } catch (err) {
-                showError("Invalid JSON structure in file.", "error");
-            }
-            customFileInput.value = ""; 
-        };
-        reader.readAsText(file);
-    });
-}
-
-// 2. Handle Web URL Fetch
-const loadCustomUrlBtn = document.getElementById('loadCustomUrlBtn');
-const customGeojsonUrl = document.getElementById('customGeojsonUrl');
-if (loadCustomUrlBtn && customGeojsonUrl) {
-    loadCustomUrlBtn.addEventListener('click', function() {
-        const url = customGeojsonUrl.value.trim();
-        if (!url) return;
-
-        const originalText = loadCustomUrlBtn.innerText;
-        loadCustomUrlBtn.innerText = "⏳...";
-        loadCustomUrlBtn.disabled = true;
-
-        const colorInput = document.getElementById('customGeojsonColor');
-        const chosenColor = colorInput ? colorInput.value : '#9b59b6';
-
-        fetch(url)
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const contentLength = response.headers.get('content-length');
-                if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
-                    throw new Error("Remote file exceeds the 10MB limit.");
-                }
-                return response.text();
-            })
-            .then(text => {
-                if (new Blob([text]).size > MAX_FILE_SIZE) {
-                    throw new Error("Remote file data exceeds the 10MB limit.");
-                }
-                const geojsonData = JSON.parse(text);
-                const filename = url.split('/').pop().split('?')[0] || 'Web Layer';
-                addCustomGeojsonToMap(geojsonData, filename, chosenColor);
-                customGeojsonUrl.value = ""; 
-            })
-            .catch(err => {
-                showError(err.message === "Failed to fetch" ? "Network error or blocked by CORS." : err.message, "error");
-            })
-            .finally(() => {
-                loadCustomUrlBtn.innerText = originalText;
-                loadCustomUrlBtn.disabled = false;
-            });
-    });
-}
-
-// =========================================================
-// 16. KMZ EXPORT FEATURE (BUG FIX & DATA SANITIZATION)
-// =========================================================
-
-const exportKmlBtn = document.getElementById('exportKmlBtn');
-if (exportKmlBtn) {
-    exportKmlBtn.addEventListener('click', () => {
-        if (typeof tokml === 'undefined' || typeof JSZip === 'undefined') {
-            showError("Export libraries not loaded. Please wait a moment or check your internet connection.", "error");
-            return;
-        }
-
-        const originalText = exportKmlBtn.innerText;
-        exportKmlBtn.innerText = "⏳ Processing Map Data...";
-        exportKmlBtn.disabled = true;
-
-        try {
-            let allFeatures = [];
-
-            function addSafeFeature(f, layerName) {
-                if (!f || !f.geometry || !f.geometry.type || !f.geometry.coordinates) return;
-                if (Array.isArray(f.geometry.coordinates) && f.geometry.coordinates.length === 0) return;
-
-                if (!f.properties) f.properties = {};
-                f.properties.LayerName = layerName;
-
-                for (let key in f.properties) {
-                    if (typeof f.properties[key] === 'object' && f.properties[key] !== null) {
-                        try {
-                            f.properties[key] = JSON.stringify(f.properties[key]);
-                        } catch (e) {
-                            f.properties[key] = "Data";
-                        }
-                    }
-                }
-                allFeatures.push(f);
-            }
-
-            // 1. Extract standard Overlays
-            Object.keys(overlays).forEach(name => {
-                const layer = overlays[name];
-                if (map.hasLayer(layer) && typeof layer.toGeoJSON === 'function') {
-                    const geojson = layer.toGeoJSON();
-                    if (geojson.type === "FeatureCollection") {
-                        geojson.features.forEach(f => addSafeFeature(f, name));
-                    } else if (geojson.type === "Feature") {
-                        addSafeFeature(geojson, name);
-                    }
-                }
-            });
-
-            // 2. Extract Warning Buffers
-            if (typeof warningLayerGroup !== 'undefined' && map.hasLayer(warningLayerGroup)) {
-                warningLayerGroup.eachLayer(layer => {
-                    if (typeof layer.toGeoJSON === 'function') {
-                        const geojson = layer.toGeoJSON();
-                        if (geojson.type === "FeatureCollection") {
-                            geojson.features.forEach(f => addSafeFeature(f, "AWS Station / 20km Buffer"));
-                        } else {
-                            addSafeFeature(geojson, "AWS Station / 20km Buffer");
-                        }
-                    }
-                });
-            }
-
-            // 3. Extract Drawings
-            if (typeof drawnItems !== 'undefined' && map.hasLayer(drawnItems)) {
-                drawnItems.eachLayer(layer => {
-                    if (typeof layer.toGeoJSON === 'function') {
-                        const geojson = layer.toGeoJSON();
-                        if (geojson.type === "FeatureCollection") {
-                            geojson.features.forEach(f => addSafeFeature(f, "My Drawings"));
-                        } else {
-                            addSafeFeature(geojson, "My Drawings");
-                        }
-                    }
-                });
-            }
-
-            if (allFeatures.length === 0) {
-                showError("No valid shapes to export. Turn on layers or draw shapes first.", "warning");
-                exportKmlBtn.innerText = originalText;
-                exportKmlBtn.disabled = false;
-                return;
-            }
-
-            const combinedGeoJSON = { type: "FeatureCollection", features: allFeatures };
-
-            exportKmlBtn.innerText = "⏳ Converting to KML...";
-            let kmlString = "";
-            
-            try {
-                kmlString = tokml(combinedGeoJSON, {
-                    documentName: 'LIGTAS-AGAD Map Export',
-                    documentDescription: 'Exported active layers and drawings from LIGTAS-AGAD RILEWS',
-                    name: 'LayerName' 
-                });
-            } catch (tokmlError) {
-                console.error("tokml Conversion Error:", tokmlError);
-                throw new Error("Failed to convert map data. Check the console for invalid shape details.");
-            }
-
-            exportKmlBtn.innerText = "⏳ Compressing KMZ...";
-            const zip = new JSZip();
-            zip.file("doc.kml", kmlString); 
-
-            zip.generateAsync({
-                type: "blob",
-                compression: "DEFLATE",
-                compressionOptions: { level: 6 } 
-            }).then(function(blob) {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                const timestamp = new Date().toISOString().replace(/T/, '_').replace(/:/g, '-').split('.')[0];
-                
-                a.href = url;
-                a.download = `LIGTAS_Export_${timestamp}.kmz`; 
-                
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                showError("KMZ file downloaded successfully!", "warning");
-            }).catch(function(err) {
-                console.error("Zipping Error:", err);
-                throw new Error("Failed to compress file into KMZ format.");
-            }).finally(function() {
-                exportKmlBtn.innerText = originalText;
-                exportKmlBtn.disabled = false;
-            });
-
-        } catch (err) {
-            console.error("Export Process Error:", err);
-            showError(err.message || "An error occurred while building the map data.", "error");
-            exportKmlBtn.innerText = originalText;
-            exportKmlBtn.disabled = false;
-        }
-    });
-}
-
-// =========================================================
-// 17. EXPORT & IMPORT WORKSPACE SETTINGS (.TXT / JSON)
-// =========================================================
-
-const exportSettingsBtn = document.getElementById('exportSettingsBtn');
-const importSettingsFile = document.getElementById('importSettingsFile');
-
-if (exportSettingsBtn) {
-    exportSettingsBtn.addEventListener('click', () => {
-        try {
-            let activeBaseMap = "Streets";
-            if (typeof baseLayersData !== 'undefined') {
-                for (const [name, layer] of Object.entries(baseLayersData)) {
-                    if (map.hasLayer(layer)) {
-                        activeBaseMap = name;
-                        break;
-                    }
-                }
-            }
-
-            const layerToggleStates = {};
-            document.querySelectorAll('.layer-toggle-input').forEach(input => {
-                if (input.id) {
-                    layerToggleStates[input.id] = input.checked;
-                }
-            });
-
-            const settingsBundle = {
-                version: "2.4",
-                timestamp: new Date().toISOString(),
-                mapState: {
-                    center: map.getCenter(),
-                    zoom: map.getZoom(),
-                    baseMap: activeBaseMap
-                },
-                themeState: {
-                    darkMode: document.body.classList.contains('dark-mode'),
-                    disableEffects: document.body.classList.contains('disable-effects'),
-                    isMasked: document.getElementById('toggleMaskBtn') && document.getElementById('toggleMaskBtn').classList.contains('btn-active')
-                },
-                sliders: {
-                    susceptibilityOpacity: document.getElementById('opacitySlider') ? document.getElementById('opacitySlider').value : 100,
-                    baseMapOpacity: document.getElementById('baseMapOpacitySlider') ? document.getElementById('baseMapOpacitySlider').value : 50,
-                    phBoundaryColor: document.getElementById('phBoundaryColor') ? document.getElementById('phBoundaryColor').value : '#ffffff',
-                    phBoundaryOpacity: document.getElementById('phBoundaryOpacitySlider') ? document.getElementById('phBoundaryOpacitySlider').value : 0,
-                    ligtasSitesColor: document.getElementById('ligtasSitesColor') ? document.getElementById('ligtasSitesColor').value : '#ffffff',
-                    ligtasSitesOpacity: document.getElementById('ligtasSitesOpacitySlider') ? document.getElementById('ligtasSitesOpacitySlider').value : 0
-                },
-                layers: layerToggleStates
-            };
-
-            const dataStr = JSON.stringify(settingsBundle, null, 2);
-            const blob = new Blob([dataStr], { type: "text/plain;charset=utf-8" });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            const dateTag = new Date().toISOString().slice(0, 10);
-            a.href = url;
-            a.download = `LIGTAS_Settings_${dateTag}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            showError("Workspace settings successfully exported to .txt!", "warning");
-        } catch (err) {
-            console.error("Export Settings Error:", err);
-            showError("Failed to export settings.", "error");
-        }
-    });
-}
-
-if (importSettingsFile) {
-    importSettingsFile.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            try {
-                const settings = JSON.parse(event.target.result);
-                
-                if (!settings || !settings.mapState || !settings.sliders) {
-                    throw new Error("Invalid format. Missing required settings structures.");
-                }
-
-                if (settings.mapState.center && settings.mapState.zoom) {
-                    map.setView([settings.mapState.center.lat, settings.mapState.center.lng], settings.mapState.zoom);
-                }
-                if (settings.mapState.baseMap && typeof baseLayersData !== 'undefined' && baseLayersData[settings.mapState.baseMap]) {
-                    Object.values(baseLayersData).forEach(layer => map.removeLayer(layer));
-                    map.addLayer(baseLayersData[settings.mapState.baseMap]);
-                }
-
-                if (typeof enableDarkMode === 'function' && settings.themeState) {
-                    enableDarkMode(settings.themeState.darkMode);
-                    localStorage.setItem('ligtas-dark-mode', settings.themeState.darkMode);
-                }
-                const effectsBtn = document.getElementById('toggleEffectsBtn');
-                if (settings.themeState && effectsBtn) {
-                    const currentlyDisabled = document.body.classList.contains('disable-effects');
-                    if (settings.themeState.disableEffects !== currentlyDisabled) {
-                        effectsBtn.click();
-                    }
-                }
-
-                const s = settings.sliders;
-                const triggerInput = (el, val) => {
-                    if (el) { el.value = val; el.dispatchEvent(new Event('input')); }
-                };
-
-                triggerInput(document.getElementById('opacitySlider'), s.susceptibilityOpacity);
-                triggerInput(document.getElementById('baseMapOpacitySlider'), s.baseMapOpacity);
-                triggerInput(document.getElementById('phBoundaryColor'), s.phBoundaryColor);
-                triggerInput(document.getElementById('phBoundaryOpacitySlider'), s.phBoundaryOpacity);
-                triggerInput(document.getElementById('ligtasSitesColor'), s.ligtasSitesColor);
-                triggerInput(document.getElementById('ligtasSitesOpacitySlider'), s.ligtasSitesOpacity);
-
-                const maskBtn = document.getElementById('toggleMaskBtn');
-                if (maskBtn && settings.themeState && typeof settings.themeState.isMasked !== 'undefined') {
-                    const isCurrentlyMasked = maskBtn.classList.contains('btn-active');
-                    if (settings.themeState.isMasked !== isCurrentlyMasked) {
-                        maskBtn.click();
-                    }
-                }
-
-                if (settings.layers) {
-                    for (const [id, shouldBeChecked] of Object.entries(settings.layers)) {
-                        const cb = document.getElementById(id);
-                        if (cb && cb.checked !== shouldBeChecked) {
-                            cb.click();
-                        }
-                    }
-                }
-
-                showError("Workspace settings imported and restored successfully!", "warning");
-                importSettingsFile.value = "";
-                
-            } catch (err) {
-                console.error("Import Settings Error:", err);
-                showError("Failed to load settings file. Ensure it is a valid LIGTAS .txt configuration.", "error");
-                importSettingsFile.value = "";
-            }
-        };
-        reader.readAsText(file);
-    });
 }
