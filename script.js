@@ -124,7 +124,7 @@ function formatPropertyName(key) {
     if (k === 'brgy' || k === 'barangay' || k === 'name_3' || k.includes('adm4')) return 'Barangay';
     if (k.includes('area') || k === 'ha' || k.includes('hectare')) return 'Distance in hectares';
     if (k === 'mun' || k === 'muni' || k.includes('municipali') || k === 'name_2' || k.includes('adm3')) return 'Municipality';
-    if (k === 'prov' || k.includes('province') || k === 'name_1' || k.includes('adm2')) return 'Region';
+    if (k === 'prov' || k.includes('province') || k === 'name_1' || k.includes('adm2')) return 'Province';
     if (k === 'reg' || k === 'region' || k === 'name_0' || k.includes('adm1')) return 'Region';
     return key.charAt(0).toUpperCase() + key.slice(1);
 }
