@@ -751,18 +751,27 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 #locationPromptModal {
     display: none;
     z-index: 9999;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+    box-sizing: border-box;
 }
 
 .location-prompt-content {
-    max-width: 490px;
+    max-width: 440px !important;
     width: 92%;
-    padding: 34px 28px 24px;
-    border-radius: 20px;
+    margin: auto;
+    padding: 24px 22px 18px;
+    border-radius: 18px;
     text-align: center;
     background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
-    box-shadow: 0 30px 65px -15px rgba(11, 83, 69, 0.35), 0 0 0 1px rgba(0, 128, 128, 0.12);
+    box-shadow: 0 25px 55px -12px rgba(11, 83, 69, 0.35), 0 0 0 1px rgba(0, 128, 128, 0.12);
     position: relative;
-    overflow: hidden;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
     animation: popUpSpring 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -773,25 +782,27 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
     top: 0;
     left: 0;
     right: 0;
-    height: 5px;
+    height: 4px;
     background: linear-gradient(90deg, #008080 0%, #268171 50%, #FFD700 100%);
+    z-index: 10;
 }
 
 .location-prompt-icon-badge {
     position: relative;
-    width: 76px;
-    height: 76px;
-    margin: 4px auto 16px auto;
+    width: 58px;
+    height: 58px;
+    margin: 2px auto 10px auto;
     border-radius: 50%;
     background: linear-gradient(135deg, #008080 0%, #00b4b4 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 12px 28px -4px rgba(0, 180, 180, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 10px 22px -4px rgba(0, 180, 180, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    flex-shrink: 0;
 }
 
 .prompt-icon {
-    font-size: 36px;
+    font-size: 28px;
     line-height: 1;
     filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
     animation: pinFloat 2.8s ease-in-out infinite;
@@ -818,74 +829,69 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 
 @keyframes prompt-radar {
     0% { transform: scale(1); opacity: 0.9; }
-    80% { transform: scale(1.8); opacity: 0; }
-    100% { transform: scale(1.8); opacity: 0; }
+    80% { transform: scale(1.6); opacity: 0; }
+    100% { transform: scale(1.6); opacity: 0; }
 }
 
 .location-prompt-title {
     color: var(--dark-teal, #1a3b42) !important;
-    font-size: 1.38rem !important;
+    font-size: 1.18rem !important;
     font-weight: 800 !important;
-    margin: 4px 0 10px 0 !important;
+    margin: 2px 0 6px 0 !important;
     padding-bottom: 0 !important;
     border-bottom: none !important;
-    line-height: 1.3;
+    line-height: 1.25;
     letter-spacing: -0.2px;
 }
 
 .location-prompt-subtitle {
-    font-size: 0.92rem;
+    font-size: 0.82rem;
     color: #64748b;
-    line-height: 1.5;
-    margin-bottom: 20px;
-    padding: 0 6px;
+    line-height: 1.4;
+    margin-bottom: 12px;
+    padding: 0 4px;
 }
 
 /* Performance Section in Onboarding Prompt */
 .prompt-perf-section {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    padding: 14px 16px;
-    margin-bottom: 20px;
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
     text-align: left;
 }
 
 .prompt-perf-header {
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     display: flex;
     align-items: center;
     justify-content: space-between;
 }
 
 .perf-badge {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 800;
     color: var(--primary-color, #008080);
-    letter-spacing: 0.8px;
+    letter-spacing: 0.7px;
     background: rgba(0, 128, 128, 0.1);
-    padding: 3px 8px;
-    border-radius: 6px;
+    padding: 2px 7px;
+    border-radius: 5px;
 }
 
 .prompt-toggle-row {
     display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
-@media (max-width: 480px) {
-    .prompt-toggle-row {
-        flex-direction: column;
-    }
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
 .toggle-card {
     flex: 1;
+    min-width: 0;
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 10px 12px;
+    border-radius: 10px;
+    padding: 8px 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -900,34 +906,40 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 .toggle-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
+    min-width: 0;
 }
 
 .toggle-header .toggle-icon {
-    font-size: 1.3rem;
+    font-size: 1.15rem;
     line-height: 1;
+    flex-shrink: 0;
+}
+
+.toggle-label-wrap {
+    min-width: 0;
 }
 
 .toggle-label-wrap strong {
     display: block;
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     color: var(--dark-teal, #1a3b42);
     line-height: 1.2;
 }
 
 .toggle-label-wrap span {
     display: block;
-    font-size: 0.7rem;
+    font-size: 0.66rem;
     color: #64748b;
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 /* Switch Toggle Component */
 .switch-toggle {
     position: relative;
     display: inline-block;
-    width: 40px;
-    height: 22px;
+    width: 36px;
+    height: 20px;
     flex-shrink: 0;
     margin-left: 6px;
     cursor: pointer;
@@ -948,14 +960,14 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
     bottom: 0;
     background-color: #cbd5e1;
     transition: 0.25s;
-    border-radius: 22px;
+    border-radius: 20px;
 }
 
 .switch-slider::before {
     position: absolute;
     content: "";
-    height: 16px;
-    width: 16px;
+    height: 14px;
+    width: 14px;
     left: 3px;
     bottom: 3px;
     background-color: white;
@@ -969,16 +981,16 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 }
 
 .switch-toggle input:checked + .switch-slider::before {
-    transform: translateX(18px);
+    transform: translateX(16px);
 }
 
 .prompt-perf-notice {
-    font-size: 0.76rem;
+    font-size: 0.72rem;
     color: #475569;
-    line-height: 1.4;
+    line-height: 1.35;
     background: #f1f5f9;
-    padding: 8px 12px;
-    border-radius: 8px;
+    padding: 6px 10px;
+    border-radius: 7px;
     border-left: 3px solid var(--primary-color, #008080);
     transition: all 0.3s ease;
 }
@@ -986,7 +998,7 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 .location-prompt-actions {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     width: 100%;
 }
 
@@ -995,15 +1007,16 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
     overflow: hidden;
     background: linear-gradient(135deg, #008080 0%, #00a896 50%, #028090 100%) !important;
     color: #ffffff !important;
-    padding: 11px 18px !important;
-    font-size: 0.85rem !important;
+    padding: 10px 16px !important;
+    font-size: 0.82rem !important;
     font-weight: 700 !important;
-    border-radius: 12px !important;
+    border-radius: 11px !important;
     border: none !important;
-    box-shadow: 0 10px 24px -6px rgba(0, 168, 150, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 8px 20px -5px rgba(0, 168, 150, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
     cursor: pointer;
     transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.25s, filter 0.25s !important;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.1px;
+    line-height: 1.3;
 }
 
 /* Moving light shimmer sweep */
@@ -1027,7 +1040,7 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 
 .btn-assess-pulse:hover {
     transform: translateY(-2px) scale(1.01);
-    box-shadow: 0 14px 30px -6px rgba(0, 168, 150, 0.7) !important;
+    box-shadow: 0 12px 26px -5px rgba(0, 168, 150, 0.7) !important;
     filter: brightness(1.05);
 }
 
@@ -1038,13 +1051,14 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 .btn-continue-browse {
     background: rgba(241, 245, 249, 0.9) !important;
     color: #475569 !important;
-    padding: 10px 18px !important;
-    font-size: 0.84rem !important;
+    padding: 8px 16px !important;
+    font-size: 0.8rem !important;
     font-weight: 600 !important;
-    border-radius: 12px !important;
+    border-radius: 11px !important;
     border: 1px solid #cbd5e1 !important;
     cursor: pointer;
     transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    line-height: 1.3;
 }
 
 .btn-continue-browse:hover {
@@ -1059,7 +1073,7 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 }
 
 .location-prompt-footer {
-    margin-top: 16px;
+    margin-top: 10px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1068,8 +1082,8 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 .prompt-remember-label {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    font-size: 0.82rem;
+    gap: 7px;
+    font-size: 0.76rem;
     color: #64748b;
     cursor: pointer;
     user-select: none;
@@ -1082,10 +1096,250 @@ body.dark-mode #controlsModal div[style*="background: #f8f9fa"] label {
 
 .prompt-remember-label input[type="checkbox"] {
     cursor: pointer;
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
     accent-color: var(--primary-color, #008080);
     border-radius: 4px;
+}
+
+/* =========================================
+   MOBILE & RESPONSIVE TUNING FOR LOCATION PROMPT
+   ========================================= */
+@media (max-width: 640px) {
+    #locationPromptModal {
+        padding: 8px;
+        align-items: center;
+    }
+
+    .location-prompt-content {
+        width: 95% !important;
+        max-width: 375px !important;
+        padding: 16px 14px 12px !important;
+        border-radius: 15px !important;
+        max-height: calc(100dvh - 16px) !important;
+    }
+
+    .location-prompt-content .close-ui-modal {
+        top: 8px !important;
+        right: 8px !important;
+        width: 26px !important;
+        height: 26px !important;
+        font-size: 18px !important;
+    }
+
+    .location-prompt-icon-badge {
+        width: 44px !important;
+        height: 44px !important;
+        margin: 0 auto 6px auto !important;
+        box-shadow: 0 6px 16px -2px rgba(0, 180, 180, 0.4) !important;
+    }
+
+    .prompt-icon {
+        font-size: 20px !important;
+    }
+
+    .location-prompt-title {
+        font-size: 1.02rem !important;
+        margin: 2px 0 4px 0 !important;
+        line-height: 1.25 !important;
+    }
+
+    .location-prompt-subtitle {
+        font-size: 0.74rem !important;
+        margin-bottom: 8px !important;
+        line-height: 1.35 !important;
+        padding: 0 !important;
+    }
+
+    .prompt-perf-section {
+        padding: 7px 9px !important;
+        margin-bottom: 8px !important;
+        border-radius: 10px !important;
+    }
+
+    .prompt-perf-header {
+        margin-bottom: 5px !important;
+    }
+
+    .perf-badge {
+        font-size: 0.62rem !important;
+        padding: 2px 5px !important;
+        letter-spacing: 0.5px !important;
+    }
+
+    .prompt-toggle-row {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 5px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .toggle-card {
+        padding: 5px 6px !important;
+        border-radius: 8px !important;
+        gap: 4px !important;
+        min-width: 0 !important;
+    }
+
+    .toggle-header {
+        gap: 4px !important;
+        min-width: 0 !important;
+    }
+
+    .toggle-header .toggle-icon {
+        font-size: 0.95rem !important;
+    }
+
+    .toggle-label-wrap {
+        min-width: 0 !important;
+        text-align: left !important;
+    }
+
+    .toggle-label-wrap strong {
+        font-size: 0.68rem !important;
+        line-height: 1.15 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .toggle-label-wrap span {
+        display: none !important; /* Hide secondary sub-label on mobile to save vertical space */
+    }
+
+    .switch-toggle {
+        width: 30px !important;
+        height: 17px !important;
+        margin-left: 2px !important;
+    }
+
+    .switch-slider {
+        border-radius: 17px !important;
+    }
+
+    .switch-slider::before {
+        height: 11px !important;
+        width: 11px !important;
+        left: 3px !important;
+        bottom: 3px !important;
+    }
+
+    .switch-toggle input:checked + .switch-slider::before {
+        transform: translateX(13px) !important;
+    }
+
+    .prompt-perf-notice {
+        font-size: 0.66rem !important;
+        padding: 4px 7px !important;
+        line-height: 1.25 !important;
+        border-radius: 6px !important;
+    }
+
+    .location-prompt-actions {
+        gap: 5px !important;
+    }
+
+    .btn-assess-pulse {
+        padding: 8px 10px !important;
+        font-size: 0.76rem !important;
+        border-radius: 9px !important;
+        box-shadow: 0 6px 14px -3px rgba(0, 168, 150, 0.5) !important;
+    }
+
+    .btn-continue-browse {
+        padding: 6px 10px !important;
+        font-size: 0.72rem !important;
+        border-radius: 9px !important;
+    }
+
+    .location-prompt-footer {
+        margin-top: 6px !important;
+    }
+
+    .prompt-remember-label {
+        font-size: 0.7rem !important;
+        gap: 5px !important;
+    }
+
+    .prompt-remember-label input[type="checkbox"] {
+        width: 13px !important;
+        height: 13px !important;
+    }
+}
+
+@media (max-width: 360px) {
+    .prompt-toggle-row {
+        grid-template-columns: 1fr !important;
+        gap: 4px !important;
+    }
+    .toggle-card {
+        padding: 4px 6px !important;
+    }
+}
+
+/* Compact layout for landscape mobile or short viewports */
+@media (max-height: 640px) {
+    #locationPromptModal {
+        align-items: flex-start !important;
+        padding: 6px !important;
+    }
+
+    .location-prompt-content {
+        padding: 10px 14px 8px !important;
+        max-height: calc(100dvh - 12px) !important;
+        border-radius: 12px !important;
+    }
+
+    .location-prompt-icon-badge {
+        display: none !important;
+    }
+
+    .location-prompt-title {
+        font-size: 0.95rem !important;
+        margin: 0 0 2px 0 !important;
+    }
+
+    .location-prompt-subtitle {
+        font-size: 0.7rem !important;
+        margin-bottom: 6px !important;
+        line-height: 1.25 !important;
+    }
+
+    .prompt-perf-section {
+        padding: 5px 8px !important;
+        margin-bottom: 6px !important;
+    }
+
+    .prompt-perf-header {
+        margin-bottom: 4px !important;
+    }
+
+    .prompt-toggle-row {
+        margin-bottom: 4px !important;
+    }
+
+    .prompt-perf-notice {
+        font-size: 0.63rem !important;
+        padding: 3px 6px !important;
+    }
+
+    .location-prompt-actions {
+        gap: 4px !important;
+    }
+
+    .btn-assess-pulse {
+        padding: 6px 10px !important;
+        font-size: 0.72rem !important;
+    }
+
+    .btn-continue-browse {
+        padding: 5px 10px !important;
+        font-size: 0.68rem !important;
+    }
+
+    .location-prompt-footer {
+        margin-top: 4px !important;
+    }
 }
 
 /* Enhanced Dark Mode for Location Prompt & Popups */
