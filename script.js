@@ -2,18 +2,80 @@
 // 1. GLOBAL ERROR HANDLING & UTILITIES
 // ==========================================
 
+let errorOverrideTimer = null;
+
+function hideErrorNotification() {
+    const errDiv = document.getElementById('errorOverride');
+    if (!errDiv) return;
+    if (errorOverrideTimer) {
+        clearTimeout(errorOverrideTimer);
+        errorOverrideTimer = null;
+    }
+    errDiv.classList.add('notice-hiding');
+    setTimeout(() => {
+        errDiv.style.display = 'none';
+        errDiv.classList.remove('notice-hiding');
+    }, 250);
+}
+window.hideErrorNotification = hideErrorNotification;
+
 function showError(message, type = 'error') {
     const errDiv = document.getElementById('errorOverride');
     const errMsg = document.getElementById('errorMessage');
+    const errIcon = document.getElementById('errorIcon');
     
     if (errDiv && errMsg) {
-        errMsg.innerHTML = `<strong>${type === 'error' ? 'System Error' : 'Notice'}:</strong> ${message}`;
-        errDiv.className = type; 
-        errDiv.style.display = 'block';
-        if (type === 'warning') { setTimeout(() => { errDiv.style.display = 'none'; }, 5000); }
+        if (errorOverrideTimer) {
+            clearTimeout(errorOverrideTimer);
+            errorOverrideTimer = null;
+        }
+
+        let typeLabel = 'Notice';
+        let defaultIcon = 'ℹ️';
+
+        if (type === 'error') {
+            typeLabel = 'System Error';
+            defaultIcon = '❌';
+        } else if (type === 'warning') {
+            typeLabel = 'Warning';
+            defaultIcon = '⚠️';
+        } else if (type === 'info') {
+            typeLabel = 'Notice';
+            defaultIcon = 'ℹ️';
+        }
+
+        if (errIcon) {
+            errIcon.innerText = defaultIcon;
+        }
+
+        errMsg.innerHTML = `<strong>${typeLabel}:</strong> ${message}`;
+        errDiv.className = `map-floating-notice ${type}`;
+        errDiv.classList.remove('notice-hiding');
+        errDiv.style.display = 'flex';
+
+        // Auto-dismiss notices and warnings after 5 seconds, errors after 8 seconds
+        const timeoutMs = type === 'error' ? 8000 : 5000;
+        errorOverrideTimer = setTimeout(() => {
+            hideErrorNotification();
+        }, timeoutMs);
     }
-    console.error(`[${type.toUpperCase()}] ${message}`);
+
+    if (type === 'error') {
+        console.error(`[${type.toUpperCase()}] ${message}`);
+    } else {
+        console.log(`[${type.toUpperCase()}] ${message}`);
+    }
 }
+
+window.addEventListener('unhandledrejection', (e) => {
+    console.warn("Handled unhandledrejection:", e.reason);
+    if (e.preventDefault) e.preventDefault();
+});
+
+window.addEventListener('error', (e) => {
+    console.warn("Handled runtime error:", e.message);
+});
+
 
 function showLoadingScreen(customMessage) {
     const splash = document.getElementById('splash-screen');
@@ -25,11 +87,486 @@ function showLoadingScreen(customMessage) {
     }
 }
 
+let hasPromptedLocation = false;
+let userLocationMarker = null;
+let userAccuracyCircle = null;
+let user5KmBufferCircle = null;
+let userRadarRangeRing = null;
+let detectedLandslidePingsGroup = null;
+let radarNearbyLandslidesGroup = null;
+let userAssessmentActive = false;
+let userAssessmentLatLng = null;
+let isLandslide5KmMaskActive = false;
+let isGpsLocating = false;
+
+// Safe global overlay dictionary
+var overlays = overlays || {};
+
+function getLandslidesLayer() {
+    if (typeof overlays === 'undefined') return null;
+    const key = Object.keys(overlays).find(k => k.includes('LIGTAS-LSDB'));
+    return key ? overlays[key] : null;
+}
+
+function applyLandslide5KmMask(centerLatLng) {
+    if (!centerLatLng) return;
+    const normCenter = L.latLng(centerLatLng);
+    userAssessmentActive = true;
+    userAssessmentLatLng = normCenter;
+    isLandslide5KmMaskActive = true;
+
+    const lsLayer = getLandslidesLayer();
+
+    // PERFORMANCE & WEBKIT CRASH FIX:
+    // Do NOT render all 8,000 regional markers to the map while 5km proximity radar is active.
+    // Removing the 8,000-marker regional layer frees up memory and prevents WebKit SVG invalidation crashes.
+    if (lsLayer && map && map.hasLayer(lsLayer)) {
+        map.removeLayer(lsLayer);
+    }
+
+    // Initialize or reset the dedicated nearby landslide layer group
+    if (!radarNearbyLandslidesGroup && map) {
+        radarNearbyLandslidesGroup = L.layerGroup().addTo(map);
+    } else if (radarNearbyLandslidesGroup) {
+        radarNearbyLandslidesGroup.clearLayers();
+        if (map && !map.hasLayer(radarNearbyLandslidesGroup)) {
+            radarNearbyLandslidesGroup.addTo(map);
+        }
+    }
+
+    // Initialize or reset the detected radar pings layer group
+    if (!detectedLandslidePingsGroup && map) {
+        detectedLandslidePingsGroup = L.layerGroup().addTo(map);
+    } else if (detectedLandslidePingsGroup) {
+        detectedLandslidePingsGroup.clearLayers();
+        if (map && !map.hasLayer(detectedLandslidePingsGroup)) {
+            detectedLandslidePingsGroup.addTo(map);
+        }
+    }
+
+    let visibleCount = 0;
+
+    // Retrieve features either from landslideFeatures array or GeoJSON layer
+    const candidateFeatures = (typeof landslideFeatures !== 'undefined' && landslideFeatures && landslideFeatures.length > 0)
+        ? landslideFeatures
+        : (lsLayer && lsLayer.toGeoJSON ? (lsLayer.toGeoJSON().features || []) : []);
+
+    candidateFeatures.forEach(feature => {
+        if (!feature.geometry || feature.geometry.type !== 'Point') return;
+        const coords = feature.geometry.coordinates;
+        if (!coords || coords.length < 2) return;
+        const mLatLng = L.latLng(coords[1], coords[0]);
+        const distMeters = normCenter.distanceTo(mLatLng);
+
+        if (distMeters <= 5000) {
+            visibleCount++;
+
+            // Create high-visibility detected landslide marker
+            const marker = L.circleMarker(mLatLng, {
+                color: '#ef4444',
+                fillColor: '#ea580c',
+                fillOpacity: 0.95,
+                radius: 7.5,
+                weight: 2.2,
+                opacity: 1,
+                className: 'detected-landslide-marker',
+                pane: 'markerPane'
+            });
+
+            marker.bindPopup(generateLandslidePointReport(feature, mLatLng), {
+                autoPan: false,
+                maxWidth: 360
+            });
+
+            marker.on('click', (e) => {
+                if (e.originalEvent) e.originalEvent._stopped = true;
+                const clickPt = e.latlng || mLatLng;
+                const freshReport = generateLandslidePointReport(feature, clickPt);
+                marker.setPopupContent(freshReport);
+
+                const p = feature.properties || {};
+                const yr = p['Year'] || p['YYYY-MM-DD'] || 'N/A';
+                const loc = p['LANDSLID_2'] || 'N/A';
+                const nearAWS = findPriorityStationNearby(clickPt, 20);
+
+                const conciseProps = {
+                    "Incident Type": "Recorded Historical Landslide",
+                    "Event Year": yr,
+                    "Location (LANDSLID_2)": loc,
+                    "Nearest AWS Station": nearAWS ? `${nearAWS.StationName || nearAWS.Station} (${nearAWS.distance} km)` : "None nearby (>20km)",
+                    "Weather Warning Level": nearAWS ? `Level ${nearAWS.RainfallLandslidethresholdwarninglevel}` : "N/A",
+                    "Recommended Action": nearAWS ? (nearAWS.Recommendedactions || "Monitor") : "Monitor Local Advisories"
+                };
+                updatePropertiesTable("Recorded Landslide Incident", conciseProps);
+                focusMapOnPopup(clickPt);
+            });
+
+            if (radarNearbyLandslidesGroup) {
+                radarNearbyLandslidesGroup.addLayer(marker);
+            }
+
+            // Add radar contact expanding ping wave animation (cap to nearest 10 for mobile WebKit performance)
+            if (visibleCount <= 10 && detectedLandslidePingsGroup) {
+                const delaySec = (((visibleCount - 1) % 5) * 0.35).toFixed(2);
+                const pingMarker = L.marker(mLatLng, {
+                    icon: L.divIcon({
+                        className: 'detected-ls-ping-icon',
+                        html: `<div class="detected-ls-ping-wave" style="animation-delay: ${delaySec}s;"></div>`,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    }),
+                    interactive: false,
+                    pane: 'markerPane'
+                });
+                detectedLandslidePingsGroup.addLayer(pingMarker);
+            }
+        }
+    });
+
+    console.log(`[5km Mask] Applied: ${visibleCount} landslides within 5km radius.`);
+    updateMaskButtonUI(true);
+}
+
+function clearLandslide5KmMask() {
+    isLandslide5KmMaskActive = false;
+    if (radarNearbyLandslidesGroup) {
+        radarNearbyLandslidesGroup.clearLayers();
+        if (map && map.hasLayer(radarNearbyLandslidesGroup)) {
+            map.removeLayer(radarNearbyLandslidesGroup);
+        }
+    }
+    if (detectedLandslidePingsGroup) {
+        detectedLandslidePingsGroup.clearLayers();
+        if (map && map.hasLayer(detectedLandslidePingsGroup)) {
+            map.removeLayer(detectedLandslidePingsGroup);
+        }
+    }
+
+    // Restore full regional landslide layer if user requests to see all regional landslides
+    const lsLayer = getLandslidesLayer();
+    if (lsLayer && map && !map.hasLayer(lsLayer)) {
+        map.addLayer(lsLayer);
+    }
+
+    updateMaskButtonUI(false);
+}
+
+function refreshLandslideMaskDisplay() {
+    if (!isLandslide5KmMaskActive || !userAssessmentLatLng) return;
+    const lsLayer = getLandslidesLayer();
+    if (lsLayer && map && map.hasLayer(lsLayer)) {
+        map.removeLayer(lsLayer);
+    }
+    if (radarNearbyLandslidesGroup && map && !map.hasLayer(radarNearbyLandslidesGroup)) {
+        map.addLayer(radarNearbyLandslidesGroup);
+    }
+    if (detectedLandslidePingsGroup && map && !map.hasLayer(detectedLandslidePingsGroup)) {
+        map.addLayer(detectedLandslidePingsGroup);
+    }
+}
+
+function toggleLandslideMask() {
+    if (isLandslide5KmMaskActive) {
+        clearLandslide5KmMask();
+        showError("5km filter disabled: Showing all recorded landslides across the region.", "info");
+    } else {
+        if (userAssessmentLatLng) {
+            applyLandslide5KmMask(userAssessmentLatLng);
+            showError("5km filter activated: Showing only landslides within 5km buffer.", "info");
+        } else {
+            showError("No active user assessment location found to apply 5km filter.", "warning");
+        }
+    }
+}
+
+function updateMaskButtonUI(isActive) {
+    const popupBtn = document.getElementById('toggleLs5kmMaskBtn');
+    if (popupBtn) {
+        popupBtn.innerHTML = isActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 5km';
+        popupBtn.classList.toggle('active', isActive);
+    }
+    document.querySelectorAll('.toggle-ls-mask-btn').forEach(btn => {
+        btn.innerHTML = isActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 5km';
+        btn.classList.toggle('active', isActive);
+    });
+    const badge = document.getElementById('bufferMaskBadge');
+    if (badge) {
+        badge.className = `buffer-status-badge ${isActive ? 'badge-active' : 'badge-inactive'}`;
+        badge.innerHTML = isActive ? '🛡️ Filtered (5km Radius Only)' : '🌐 Inactive (All Regional Shown)';
+    }
+}
+
+function fitTo5KmBuffer() {
+    if (user5KmBufferCircle && map) {
+        map.fitBounds(user5KmBufferCircle.getBounds(), {
+            padding: [60, 60],
+            maxZoom: 14,
+            animate: true,
+            duration: 0.8
+        });
+    } else if (userAssessmentLatLng && map) {
+        map.setView(userAssessmentLatLng, 13);
+    }
+}
+
+function clearUserLocationAssessment() {
+    userAssessmentActive = false;
+    userAssessmentLatLng = null;
+
+    if (userLocationMarker && map) {
+        map.removeLayer(userLocationMarker);
+        userLocationMarker = null;
+    }
+    if (userAccuracyCircle && map) {
+        map.removeLayer(userAccuracyCircle);
+        userAccuracyCircle = null;
+    }
+    if (user5KmBufferCircle && map) {
+        map.removeLayer(user5KmBufferCircle);
+        user5KmBufferCircle = null;
+    }
+    if (userRadarRangeRing && map) {
+        map.removeLayer(userRadarRangeRing);
+        userRadarRangeRing = null;
+    }
+
+    clearLandslide5KmMask();
+    if (typeof hideLandslidePointsLSDB === 'function') {
+        hideLandslidePointsLSDB();
+    }
+    showError("GPS Proximity Landslide Radar cleared and normal map view restored.", "info");
+}
+
+function resetMapView() {
+    if (!map) return;
+    const center = (typeof initialCenter !== 'undefined') ? initialCenter : [12.8797, 121.7740];
+    const zoom = (typeof initialZoom !== 'undefined') ? initialZoom : 6;
+    const hadRadar = (typeof userAssessmentActive !== 'undefined' && userAssessmentActive);
+
+    if (typeof clearUserLocationAssessment === 'function') {
+        clearUserLocationAssessment();
+    }
+    if (typeof resetGeoJSONHighlight === 'function') {
+        resetGeoJSONHighlight();
+    }
+    if (typeof hideLandslidePointsLSDB === 'function') {
+        hideLandslidePointsLSDB();
+    }
+    map.closePopup();
+    map.setView(center, zoom);
+    if (!hadRadar) {
+        showError("Map view reset to default.", "info");
+    }
+}
+window.resetMapView = resetMapView;
+
+
+
+function focusMapOnPopup(latlng, targetZoom = null) {
+    if (!map || !latlng) return;
+    try {
+        const normLatLng = L.latLng(latlng);
+        const currentZoom = map.getZoom();
+        const destZoom = targetZoom !== null ? targetZoom : (currentZoom < 13 ? 14 : currentZoom);
+        
+        // Project at destZoom and shift upward by 140px so the popup balloon sits dead-center in the map viewport below navigation
+        const pt = map.project(normLatLng, destZoom);
+        const offsetPt = pt.subtract([0, 140]);
+        const offsetLatLng = map.unproject(offsetPt, destZoom);
+        
+        const zoomDelta = Math.abs(currentZoom - destZoom);
+        const animDuration = zoomDelta > 3 ? 0.9 : 0.6;
+        
+        map.flyTo(offsetLatLng, destZoom, { 
+            animate: true, 
+            duration: animDuration,
+            easeLinearity: 0.25
+        });
+    } catch (err) {
+        console.error("Error focusing on popup:", err);
+    }
+}
+
+function setVisualEffects(enabled, showNotice = false) {
+    const body = document.body;
+    const toggleEffectsBtn = document.getElementById('toggleEffectsBtn');
+    
+    if (!enabled) {
+        body.classList.add('disable-effects');
+        if (toggleEffectsBtn) {
+            toggleEffectsBtn.innerText = '✨ Enable Effects';
+            toggleEffectsBtn.classList.add('btn-warning');
+        }
+    } else {
+        body.classList.remove('disable-effects');
+        if (toggleEffectsBtn) {
+            toggleEffectsBtn.innerText = '✨ Disable Effects';
+            toggleEffectsBtn.classList.remove('btn-warning');
+        }
+        // If enabling visual effects, automatically disable heavy landslide data
+        setLandslideData(false, false);
+        if (showNotice) {
+            showError("Visual effects enabled: Landslide layers disabled to optimize performance.", "warning");
+        }
+    }
+}
+
+function hideLandslidePointsLSDB() {
+    if (radarNearbyLandslidesGroup && map) {
+        radarNearbyLandslidesGroup.clearLayers();
+        if (map.hasLayer(radarNearbyLandslidesGroup)) {
+            map.removeLayer(radarNearbyLandslidesGroup);
+        }
+    }
+    if (detectedLandslidePingsGroup && map) {
+        detectedLandslidePingsGroup.clearLayers();
+        if (map.hasLayer(detectedLandslidePingsGroup)) {
+            map.removeLayer(detectedLandslidePingsGroup);
+        }
+    }
+    if (typeof overlays !== 'undefined') {
+        Object.keys(overlays).forEach(k => {
+            if (k.includes('LIGTAS-LSDB') || k.includes('LandslideDB') || k.includes('Recorded Landslides')) {
+                const layer = overlays[k];
+                if (layer && map && map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                }
+            }
+        });
+    }
+    const lsLayer = getLandslidesLayer();
+    if (lsLayer && map && map.hasLayer(lsLayer)) {
+        map.removeLayer(lsLayer);
+    }
+    document.querySelectorAll('.layer-toggle-input').forEach(cb => {
+        const label = cb.nextElementSibling ? cb.nextElementSibling.innerText : '';
+        if (label.includes('LIGTAS-LSDB') || label.includes('Recorded Landslides')) {
+            cb.checked = false;
+        }
+    });
+}
+window.hideLandslidePointsLSDB = hideLandslidePointsLSDB;
+
+function setLandslideData(enabled, showNotice = false, includeLSDB = false) {
+    if (!map || typeof overlays === 'undefined') return;
+
+    const landslideKeys = Object.keys(overlays).filter(k => 
+        k.includes('LIGTAS-LSDB') || k.includes('MGB') || k.includes('Susceptibility')
+    );
+
+    landslideKeys.forEach(k => {
+        const layer = overlays[k];
+        if (layer) {
+            if (enabled) {
+                if (k.includes('MGB-HIGH')) {
+                    if (!map.hasLayer(layer)) map.addLayer(layer);
+                } else if (k.includes('LIGTAS-LSDB')) {
+                    if (includeLSDB) {
+                        if (!map.hasLayer(layer)) map.addLayer(layer);
+                    } else {
+                        if (map.hasLayer(layer)) map.removeLayer(layer);
+                    }
+                }
+            } else {
+                if (map.hasLayer(layer)) map.removeLayer(layer);
+            }
+        }
+    });
+
+    // Update sidebar checkboxes if initialized
+    document.querySelectorAll('.layer-toggle-input').forEach(cb => {
+        const label = cb.nextElementSibling ? cb.nextElementSibling.innerText : '';
+        if (label.includes('MGB-HIGH')) {
+            cb.checked = enabled;
+        } else if (label.includes('LIGTAS-LSDB')) {
+            cb.checked = enabled && includeLSDB;
+        } else if (!enabled && (label.includes('MGB') || label.includes('Susceptibility'))) {
+            cb.checked = false;
+        }
+    });
+
+    // RULE: If landslide data is enabled, automatically disable visual effects to prevent performance issues
+    if (enabled) {
+        setVisualEffects(false, false);
+        if (showNotice) {
+            showError("Landslide Data active: Visual effects auto-disabled to optimize performance.", "warning");
+        }
+    }
+}
+
+function gpsProximityLandslideRadar() {
+    hasPromptedLocation = true;
+    if (!map) return;
+
+    if (isGpsLocating) {
+        showError("GPS acquisition already in progress. Please wait...", "info");
+        return;
+    }
+    isGpsLocating = true;
+
+    // Show non-blocking status notification that doesn't freeze the WebKit compositor
+    showError("📡 Acquiring GPS Signal for GPS PROXIMITY LANDSLIDE RADAR (5km)...", "info");
+
+    try {
+        map.locate({ 
+            setView: false, 
+            maxZoom: 17, 
+            enableHighAccuracy: true, 
+            timeout: 12000,
+            maximumAge: 30000
+        }); 
+    } catch (err) {
+        isGpsLocating = false;
+        console.error("GPS locate call failed:", err);
+        showError("Could not initiate GPS location on this browser.", "warning");
+    }
+}
+const assessUserLocation = gpsProximityLandslideRadar;
+window.gpsProximityLandslideRadar = gpsProximityLandslideRadar;
+window.assessUserLocation = gpsProximityLandslideRadar;
+
+function showLocationPrompt() {
+    if (hasPromptedLocation) return;
+    hasPromptedLocation = true;
+
+    if (sessionStorage.getItem('ligtas-skip-location-prompt') === 'true') {
+        return;
+    }
+
+    const modal = document.getElementById('locationPromptModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        const promptLandslideToggle = document.getElementById('promptLandslideToggle');
+        const promptEffectsToggle = document.getElementById('promptEffectsToggle');
+        if (promptLandslideToggle) promptLandslideToggle.checked = true;
+        if (promptEffectsToggle) promptEffectsToggle.checked = false;
+        if (typeof updatePromptNotice === 'function') updatePromptNotice();
+    }
+}
+
+function dismissLocationPrompt() {
+    const modal = document.getElementById('locationPromptModal');
+    const rememberCheckbox = document.getElementById('promptRememberChoice');
+
+    if (rememberCheckbox && rememberCheckbox.checked) {
+        sessionStorage.setItem('ligtas-skip-location-prompt', 'true');
+    }
+
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
 function hideLoadingScreen() {
     const splash = document.getElementById('splash-screen');
     if (splash) {
         splash.classList.add('hidden');
-        setTimeout(() => { splash.style.display = 'none'; }, 1000); 
+        setTimeout(() => { 
+            splash.style.display = 'none'; 
+            if (!hasPromptedLocation) {
+                showLocationPrompt();
+            }
+        }, 1000); 
     }
 }
 
@@ -152,9 +689,11 @@ function updatePropertiesTable(layerName, properties) {
     }
 
     try {
+        const isSyncLayer = typeof synchronizedLayers !== 'undefined' && synchronizedLayers.some(sl => sl.name === layerName || (sl.targetAws && layerName.includes(sl.targetAws)));
         for (const [key, value] of Object.entries(properties)) {
             const kLower = String(key).toLowerCase().trim();
             if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
+            if (isSyncLayer && ['site id', 'site_id', 'site name', 'site_name', 'latitude', 'longitude', 'lat', 'long'].includes(kLower)) continue;
             const displayKey = formatPropertyName(key); let displayValue = formatPropertyValue(key, value);
             if (typeof displayValue === 'object' && displayValue !== null) displayValue = JSON.stringify(displayValue);
             const row = document.createElement('tr');
@@ -244,10 +783,54 @@ try {
     map.getPane('siteBoundaries').style.zIndex = 460;
     map.getPane('siteBoundaries').style.pointerEvents = 'none';
 
-    // Reset GeoJSON Highlight when map canvas is clicked directly
+    // Prevent clicks inside map-floating-notice from propagating to the map canvas
+    const errNotificationEl = document.getElementById('errorOverride');
+    if (errNotificationEl && typeof L !== 'undefined' && L.DomEvent) {
+        L.DomEvent.disableClickPropagation(errNotificationEl);
+        L.DomEvent.disableScrollPropagation(errNotificationEl);
+    }
+
+    // Reset GeoJSON Highlight when map canvas is clicked directly & show raster popup if raster is active
     map.on('click', (e) => {
         if (e.originalEvent && !e.originalEvent._stopped) {
             resetGeoJSONHighlight();
+            if (typeof showRaster !== 'undefined' && showRaster) {
+                const latlng = e.latlng;
+                const nearestSt = typeof findPriorityStationNearby === 'function' ? findPriorityStationNearby(latlng, 35) : null;
+                const lsNearby = typeof getNearbyLandslideCount === 'function' ? getNearbyLandslideCount(latlng, 10) : 0;
+                const dayNum = (typeof currentGroupIndex !== 'undefined') ? (currentGroupIndex + 1) : 1;
+                const popupContent = `
+                    <div class="popup-container">
+                        <div class="popup-header">🌧️ PAGASA WRF Rainfall Forecast (Day ${dayNum})</div>
+                        <div class="popup-scroll-container">
+                            <div class="popup-section-title">1. Forecast Location</div>
+                            <table class="popup-table">
+                                <tr><th>Coordinates</th><td>${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}</td></tr>
+                                <tr><th>Forecast Horizon</th><td>Day ${dayNum} of 10-day WRF model</td></tr>
+                            </table>
+                            <div class="popup-section-title">2. Nearest Monitoring Station</div>
+                            <table class="popup-table">
+                                ${nearestSt ? `
+                                    <tr><th>Station</th><td><strong>${nearestSt.StationName || nearestSt.Station}</strong></td></tr>
+                                    <tr><th>Distance</th><td>${nearestSt.distance} km</td></tr>
+                                    <tr><th>Warning Level</th><td><span class="warning-badge badge-level-${nearestSt.RainfallLandslidethresholdwarninglevel || 0}">Level ${nearestSt.RainfallLandslidethresholdwarninglevel || 0}</span></td></tr>
+                                    <tr><th>Rainfall</th><td><b>${nearestSt.Rainfall || nearestSt.R24H || '0'}</b> mm</td></tr>
+                                ` : `<tr><td colspan="2" style="text-align:center; color:#888;">No active AWS within 35km</td></tr>`}
+                            </table>
+                            <div class="popup-section-title">3. Historical Landslides</div>
+                            <table class="popup-table">
+                                <tr><th>Recorded Events (10km)</th><td><b style="color:var(--primary-color);">${lsNearby}</b> event(s)</td></tr>
+                            </table>
+                        </div>
+                        <div class="popup-credits">DOST Project LIGTAS-AGAD RIILEWS Forecast System</div>
+                    </div>
+                `;
+                L.popup({ autoPan: false, maxWidth: 360 })
+                    .setLatLng(latlng)
+                    .setContent(popupContent)
+                    .openOn(map);
+                if (typeof focusMapOnPopup === 'function') focusMapOnPopup(latlng);
+            }
         }
     });
 
@@ -275,7 +858,7 @@ try {
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri', opacity: 0.5, pane: 'topTiles' })
         ])
     };
-    baseLayersData["Hybrid"].addTo(map);
+    baseLayersData["Streets"].addTo(map);
 
     L.control.scale().addTo(map); L.control.locate().addTo(map);
     
@@ -347,29 +930,209 @@ try {
     }
 
     map.on('locationfound', function(e) {
+        isGpsLocating = false;
         hideLoadingScreen(); 
-        const latlng = e.latlng;
-        const priorityStation = findPriorityStationNearby(latlng, 20); 
-        const lsCount = getNearbyLandslideCount(latlng, 5); 
-        const userProperties = { "Location Type": "User Current Location", "Latitude": latlng.lat.toFixed(5), "Longitude": latlng.lng.toFixed(5) };
-        const reportContent = generateCombinedReport("User Location", userProperties, priorityStation, lsCount);
-        
-        if (typeof isWatchingAlerts !== 'undefined' && isWatchingAlerts) {
-            checkAndTriggerMobileNotification(priorityStation);
-        } else {
-            L.popup().setLatLng(latlng).setContent(reportContent).openOn(map);
-            updatePropertiesTable("User Location", userProperties);
+
+        try {
+            const latlng = e.latlng;
+            const accuracyMeters = Math.round(e.accuracy || 0);
+
+            // Remove previous GPS marker, accuracy circle, and buffer circles if any
+            if (userLocationMarker) {
+                map.removeLayer(userLocationMarker);
+                userLocationMarker = null;
+            }
+            if (userAccuracyCircle) {
+                map.removeLayer(userAccuracyCircle);
+                userAccuracyCircle = null;
+            }
+            if (user5KmBufferCircle) {
+                map.removeLayer(user5KmBufferCircle);
+                user5KmBufferCircle = null;
+            }
+            if (userRadarRangeRing) {
+                map.removeLayer(userRadarRangeRing);
+                userRadarRangeRing = null;
+            }
+
+            // Draw accuracy circle with high-visibility cyan radar perimeter (GPU-safe)
+            userAccuracyCircle = L.circle(latlng, {
+                radius: Math.max(accuracyMeters, 5),
+                color: 'rgba(0, 255, 255, 0.75)',
+                fillColor: '#00ffff',
+                fillOpacity: 0.05,
+                weight: 1.5,
+                dashArray: '5, 5',
+                className: 'cyan-accuracy-circle',
+                pane: 'overlayPane'
+            }).addTo(map);
+
+            userAccuracyCircle.bindTooltip(`📍 GPS Accuracy: ±${accuracyMeters} meters`, {
+                direction: 'top',
+                offset: [0, -5],
+                className: 'cyan-accuracy-tooltip'
+            });
+
+            // Modern, lightweight Cyan Radar Beacon (Hardware-Accelerated & WebKit-Safe)
+            const userIcon = L.divIcon({
+                className: 'user-location-marker-container cyan-radar-mode',
+                html: `
+                    <div class="user-location-radar-sweep"></div>
+                    <div class="user-location-pulse-ring ring-1"></div>
+                    <div class="user-location-pulse-ring ring-2"></div>
+                    <div class="user-location-dot">
+                        <div class="user-location-dot-core"></div>
+                    </div>
+                `,
+                iconSize: [60, 60],
+                iconAnchor: [30, 30],
+                popupAnchor: [0, -26]
+            });
+
+            userLocationMarker = L.marker(latlng, {
+                icon: userIcon,
+                zIndexOffset: 2000,
+                title: `Your Location (±${accuracyMeters}m)`
+            }).addTo(map);
+
+            const priorityStation = findPriorityStationNearby(latlng, 20); 
+            const lsCount = getNearbyLandslideCount(latlng, 5); 
+
+            // Draw 5km Assessment Zone Cyan Radar Buffer Circle
+            user5KmBufferCircle = L.circle(latlng, {
+                radius: 5000,
+                color: '#00e5ff',
+                fillColor: '#00e5ff',
+                fillOpacity: 0.035,
+                weight: 1.6,
+                dashArray: '6, 6',
+                className: 'user-5km-buffer-zone',
+                interactive: true
+            }).addTo(map);
+
+            user5KmBufferCircle.bindTooltip(`📡 GPS PROXIMITY LANDSLIDE RADAR (5km Buffer): ${lsCount} detected`, {
+                direction: 'top',
+                offset: [0, -10],
+                className: 'buffer-5km-tooltip'
+            });
+
+            // Concentric 2.5km inner range ring for tactical radar display
+            userRadarRangeRing = L.circle(latlng, {
+                radius: 2500,
+                color: 'rgba(0, 229, 255, 0.3)',
+                fillColor: 'transparent',
+                fillOpacity: 0,
+                weight: 1,
+                dashArray: '4, 4',
+                className: 'user-radar-range-ring',
+                interactive: false
+            }).addTo(map);
+
+            user5KmBufferCircle.on('click', () => {
+                if (userLocationMarker) {
+                    focusMapOnPopup(latlng);
+                    userLocationMarker.openPopup();
+                }
+            });
+
+            // Mask out distant landslides and populate nearby radar landslides
+            applyLandslide5KmMask(latlng);
+
+            // Accuracy classification badge
+            let accuracyBadge = '';
+            if (accuracyMeters <= 25) {
+                accuracyBadge = `<span class="accuracy-pill accuracy-high">🟢 High (±${accuracyMeters} m)</span>`;
+            } else if (accuracyMeters <= 100) {
+                accuracyBadge = `<span class="accuracy-pill accuracy-med">🟡 Fair (±${accuracyMeters} m)</span>`;
+            } else {
+                accuracyBadge = `<span class="accuracy-pill accuracy-low">🔴 Approx (±${accuracyMeters} m)</span>`;
+            }
+
+            const userProperties = {
+                "Location Type": "📍 GPS Detected Location",
+                "Latitude": `${latlng.lat.toFixed(6)}°`,
+                "Longitude": `${latlng.lng.toFixed(6)}°`,
+                "GPS Accuracy": `±${accuracyMeters} meters`,
+                "Signal Precision": accuracyBadge
+            };
+
+            const reportContent = generateCombinedReport("GPS PROXIMITY LANDSLIDE RADAR", userProperties, priorityStation, lsCount);
+
+            if (typeof isWatchingAlerts !== 'undefined' && isWatchingAlerts) {
+                checkAndTriggerMobileNotification(priorityStation);
+            }
+
+            // CRITICAL FOR SAFARI / ALL BROWSERS: autoPan: false prevents animation collision with flyTo
+            userLocationMarker.bindPopup(reportContent, {
+                autoPan: false,
+                maxWidth: 360,
+                className: 'user-location-popup'
+            });
+
+            // Determine optimal zoom level based on accuracy
+            const targetZoom = accuracyMeters < 100 ? 16 : (accuracyMeters < 500 ? 15 : 14);
+
+            userLocationMarker.on('click', () => {
+                focusMapOnPopup(latlng, targetZoom);
+            });
+
+            // Smoothly fly and focus map directly on user location
+            focusMapOnPopup(latlng, targetZoom);
+
+            // Open popup cleanly AFTER map movement completes
+            let popupOpened = false;
+            const openPopupSafely = () => {
+                if (popupOpened) return;
+                popupOpened = true;
+                if (userLocationMarker) {
+                    userLocationMarker.openPopup();
+                }
+            };
+
+            map.once('moveend', () => {
+                setTimeout(openPopupSafely, 200);
+            });
+            setTimeout(openPopupSafely, 1500); // Reliable fallback if moveend finished early
+
+            updatePropertiesTable("GPS PROXIMITY LANDSLIDE RADAR", userProperties);
+            showError(`📍 GPS Signal Locked: ${lsCount} landslide(s) within 5km radius`, "info");
+        } catch (err) {
+            console.error("Error processing locationfound:", err);
+            showError("GPS location acquired, but an error occurred updating map layers.", "warning");
         }
     });
     
-    map.on('locationerror', function(e) { hideLoadingScreen(); showError("Could not acquire GPS location. Check permissions.", 'warning'); });
+    map.on('locationerror', function(e) { 
+        isGpsLocating = false;
+        hideLoadingScreen(); 
+        showError("Could not acquire GPS location: " + (e.message || "Permission denied or unavailable"), 'warning'); 
+    });
+
+    map.on('overlayremove', (e) => {
+        if (e.name && e.name.includes('LIGTAS-LSDB')) {
+            if (detectedLandslidePingsGroup) detectedLandslidePingsGroup.clearLayers();
+            if (radarNearbyLandslidesGroup) radarNearbyLandslidesGroup.clearLayers();
+        }
+    });
+    map.on('overlayadd', (e) => {
+        if (e.name && e.name.includes('LIGTAS-LSDB') && isLandslide5KmMaskActive && userAssessmentLatLng) {
+            applyLandslide5KmMask(userAssessmentLatLng);
+        }
+    });
+    map.on('zoomend moveend', () => {
+        if (isLandslide5KmMaskActive && userAssessmentLatLng) {
+            refreshLandslideMaskDisplay();
+        }
+    });
     
     L.Control.ResetView = L.Control.extend({
         onAdd: map => {
             const c = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
             c.style.backgroundColor = 'white'; c.style.width = '30px'; c.style.height = '30px'; c.style.cursor = 'pointer';
             c.innerHTML = '<span style="font-size:20px; line-height:30px; display:block; text-align:center;">🏠</span>'; c.title = "Reset View";
-            c.onclick = () => map.setView(initialCenter, initialZoom);
+            c.onclick = () => {
+                resetMapView();
+            };
             return c;
         }
     });
@@ -380,14 +1143,13 @@ try {
             const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control gps-image-btn');
             const img = L.DomUtil.create('img', '', container);
             img.src = 'https://raw.githubusercontent.com/LIGTAS-AGAD/ligtas-agad-rilews-v-15-mobile-edition/refs/heads/main/ISLAW2.png'; 
-            img.title = "Assess My Current Location";
+            img.title = "GPS PROXIMITY LANDSLIDE RADAR (5km Radius)";
             const closeBtn = L.DomUtil.create('div', 'gps-close-btn', container);
             closeBtn.innerHTML = '×'; closeBtn.title = "Hide GPS Button";
 
             img.onclick = (e) => {
                 L.DomEvent.stopPropagation(e);
-                showLoadingScreen("Acquiring GPS Signal..."); 
-                map.locate({setView: true, maxZoom: 16, timeout: 10000});
+                gpsProximityLandslideRadar();
             };
 
             closeBtn.onclick = (e) => {
@@ -405,7 +1167,7 @@ try {
 // 4. GEOJSON LAYERS & STRICT 20KM LOGIC
 // ==========================================
 
-let overlays = {};
+overlays = overlays || {};
 const layerData = [
     { name: 'LIGTAS-LSDB', desc: 'Recorded Landslides', color: 'orange' }, 
     { name: 'MGB-HIGH', desc: 'HIGH Susceptibility', color: 'red' }, 
@@ -476,52 +1238,344 @@ function getNearbyLandslideCount(latlng, radiusKm = 5) {
     return count;
 }
 
-function generateCombinedReport(layerName, properties, nearestStation, landslideCount) {
+function generateCombinedReport(layerName, properties, nearestStation, landslideCount, isSyncAWS = false) {
+    const isSyncLayer = isSyncAWS || (typeof synchronizedLayers !== 'undefined' && synchronizedLayers.some(sl => sl.name === layerName || (sl.targetAws && layerName.includes(sl.targetAws))));
     let susContent = '';
-    for (const [key, value] of Object.entries(properties)) {
-        const kLower = String(key).toLowerCase().trim();
-        if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
-        const displayKey = formatPropertyName(key); let displayValue = formatPropertyValue(key, value);
-        if (typeof displayValue === 'string' && (displayValue.startsWith('http') || displayValue.startsWith('www'))) {
-             displayValue = `<a href="${displayValue}" target="_blank" style="color:var(--primary-color); text-decoration:none; font-weight:bold;">View Link 🔗</a>`;
+    const safeProps = properties || {};
+
+    if (isSyncLayer) {
+        // 1. Reorganize Section 1 for initSynchronizedAWSLayer:
+        // Exclude: Site ID, Site Name, Latitude, Longitude (and any raw sensor metadata)
+        // Include ONLY: LS Landslide Susceptibility based on layer attributes, followed by Region, Province, Municipality, and Barangay
+
+        // A. LS Landslide Susceptibility
+        let lsVal = '';
+        for (const [k, v] of Object.entries(safeProps)) {
+            const cleanKey = k.toLowerCase().replace(/[^a-z]/g, '');
+            if (cleanKey === 'ls' || cleanKey === 'landslide' || cleanKey.includes('suscept') || cleanKey === 'rating') {
+                lsVal = v;
+                break;
+            }
         }
-        susContent += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
+        if (!lsVal && safeProps['LS']) lsVal = safeProps['LS'];
+        if (!lsVal && safeProps['Landslide ']) lsVal = safeProps['Landslide '];
+        if (!lsVal) lsVal = 'High Landslide Susceptibility';
+
+        // B. Region
+        let regVal = '';
+        for (const [k, v] of Object.entries(safeProps)) {
+            const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (cleanKey === 'region' || cleanKey === 'reg' || cleanKey === 'name0' || cleanKey === 'adm1') {
+                regVal = v;
+                break;
+            }
+        }
+        if (!regVal) regVal = 'N/A';
+
+        // C. Province
+        let provVal = '';
+        for (const [k, v] of Object.entries(safeProps)) {
+            const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (cleanKey === 'province' || cleanKey === 'prov' || cleanKey === 'name1' || cleanKey === 'adm2') {
+                provVal = v;
+                break;
+            }
+        }
+        if (!provVal) provVal = 'N/A';
+
+        // D. Municipality
+        let munVal = '';
+        for (const [k, v] of Object.entries(safeProps)) {
+            const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (cleanKey === 'municipality' || cleanKey === 'municipali' || cleanKey === 'mun' || cleanKey === 'muni' || cleanKey === 'name2' || cleanKey === 'adm3') {
+                munVal = v;
+                break;
+            }
+        }
+        if (!munVal) munVal = 'N/A';
+
+        // E. Barangay
+        let brgyVal = '';
+        for (const [k, v] of Object.entries(safeProps)) {
+            const cleanKey = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (cleanKey === 'barangay' || cleanKey === 'brgy' || cleanKey === 'name3' || cleanKey === 'adm4') {
+                brgyVal = v;
+                break;
+            }
+        }
+        if (!brgyVal) brgyVal = 'N/A';
+
+        susContent = `
+            <tr><th>LS Landslide Susceptibility</th><td><strong>${lsVal}</strong></td></tr>
+            <tr><th>Region</th><td>${regVal}</td></tr>
+            <tr><th>Province</th><td>${provVal}</td></tr>
+            <tr><th>Municipality</th><td>${munVal}</td></tr>
+            <tr><th>Barangay</th><td>${brgyVal}</td></tr>
+        `;
+    } else {
+        for (const [key, value] of Object.entries(safeProps)) {
+            const kLower = String(key).toLowerCase().trim();
+            if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
+            const displayKey = formatPropertyName(key); let displayValue = formatPropertyValue(key, value);
+            if (typeof displayValue === 'string' && (displayValue.startsWith('http') || displayValue.startsWith('www'))) {
+                 displayValue = `<a href="${displayValue}" target="_blank" style="color:var(--primary-color); text-decoration:none; font-weight:bold;">View Link 🔗</a>`;
+            }
+            susContent += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
+        }
     }
 
     let stationContent = `
         <tr>
-            <td colspan="2" style="text-align:center; padding:15px; color:#c0392b; font-weight:bold;">
+            <td colspan="2" style="text-align:center; padding:14px; color:#e11d48; font-weight:700; background:rgba(244,63,94,0.06); border-radius:8px;">
                 ❌ No AWS nearby (Out of 20km Coverage Zone)
             </td>
         </tr>`;
 
     if (nearestStation) {
-        const wLevel = nearestStation.RainfallLandslidethresholdwarninglevel;
-        const color = wLevel == 1 ? 'yellow' : (wLevel == 2 ? 'orange' : (wLevel == 3 ? 'red' : 'green'));
+        const rawWLevel = parseInt(nearestStation.RainfallLandslidethresholdwarninglevel) || 0;
+        const badgeClass = `badge-level-${rawWLevel}`;
         stationContent = `
-            <tr><th>Nearest Station</th><td>${nearestStation.StationName || nearestStation.Station}</td></tr>
+            <tr><th>Nearest Station</th><td><strong>${nearestStation.StationName || nearestStation.Station}</strong></td></tr>
             <tr><th>Distance</th><td>${nearestStation.distance} km</td></tr>
-            <tr><th>Warning Level</th><td style="background-color:${color}; font-weight:bold;">Level ${wLevel}</td></tr>
-            <tr><th>Rainfall Antecedent+Cumulative (7-days)</th><td>${nearestStation.R24H || nearestStation.Rainfall || '0'} mm</td></tr>
+            <tr><th>Warning Level</th><td><span class="warning-badge ${badgeClass}">${rawWLevel > 0 ? '⚠️ ' : '✅ '}Level ${rawWLevel}</span></td></tr>
+            <tr><th>Rainfall (7-days)</th><td><b>${nearestStation.R24H || nearestStation.Rainfall || '0'}</b> mm</td></tr>
             <tr><th>Latitude</th><td>${nearestStation.Latitude || 'N/A'}</td></tr>
             <tr><th>Longitude</th><td>${nearestStation.Longitude || 'N/A'}</td></tr>
             <tr><th>Elevation</th><td>${nearestStation.Elevation ? nearestStation.Elevation + ' m' : 'N/A'}</td></tr>
-            <tr><th>Rec. Actions</th><td>${nearestStation.Recommendedactions || 'Monitor'}</td></tr>
+            <tr><th>Rec. Actions</th><td><span style="color:var(--dark-teal); font-weight:600;">${nearestStation.Recommendedactions || 'Monitor'}</span></td></tr>
         `;
     }
 
-    let lsContent = `<tr><th>Nearby Landslides (5km)</th><td><b>${landslideCount}</b> recorded event(s)</td></tr>`;
+    let lsContent = `
+        <tr><th>Nearby Landslides (5km)</th><td><b style="color:var(--primary-color); font-size:1.05em;">${landslideCount}</b> recorded event(s)</td></tr>
+    `;
+    if (layerName === "User Location" || layerName.includes("GPS PROXIMITY") || userAssessmentActive) {
+        lsContent += `
+            <tr>
+                <th>5km Buffer Mask</th>
+                <td>
+                    <span id="bufferMaskBadge" class="buffer-status-badge ${isLandslide5KmMaskActive ? 'badge-active' : 'badge-inactive'}">
+                        ${isLandslide5KmMaskActive ? '🛡️ Filtered (5km Radius Only)' : '🌐 Inactive (All Regional Shown)'}
+                    </span>
+                </td>
+            </tr>
+        `;
+    }
+
+    let userLocationActions = '';
+    if (layerName === "User Location" || layerName.includes("GPS PROXIMITY")) {
+        userLocationActions = `
+            <div class="user-assessment-controls" style="margin: 8px 0 4px 0; display: flex; flex-direction: column; gap: 4px;">
+                <button class="filter-ls-btn toggle-ls-mask-btn" id="toggleLs5kmMaskBtn" onclick="toggleLandslideMask()">
+                    ${isLandslide5KmMaskActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 5km'}
+                </button>
+                <button class="filter-ls-btn outline" onclick="fitTo5KmBuffer()">
+                    🔍 Fit Map to 5km Buffer Zone
+                </button>
+            </div>
+        `;
+    }
+
+    let clearBtnHtml = (layerName === "User Location" || layerName.includes("GPS PROXIMITY")) ? 
+        `<button class="clear-btn" onclick="clearUserLocationAssessment()" title="Clear GPS Proximity Radar & Restore Map" style="background:#ef4444; color:white; border:none; border-radius:6px; padding:6px 12px; font-weight:600; cursor:pointer;">✕ Clear</button>` : '';
+
+    const popupHeaderTitle = (layerName === "User Location" || layerName.includes("GPS PROXIMITY")) ? 
+        "GPS PROXIMITY LANDSLIDE RADAR" : "Generated Report";
+
+    const section1Title = isSyncLayer ? "1 LOCATION DETAILS (Barangay)" : `1. Location Details (${layerName})`;
 
     return `
         <div class="popup-container">
-            <div class="popup-header">Generated Report</div>
+            <div class="popup-header">${popupHeaderTitle}</div>
             <div class="popup-scroll-container">
-                <div class="popup-section-title">1. Location Details (${layerName})</div>
+                <div class="popup-section-title">${section1Title}</div>
                 <table class="popup-table">${susContent}</table>
                 <div class="popup-section-title">2. Weather Status</div>
                 <table class="popup-table">${stationContent}</table>
                 <div class="popup-section-title">3. Historical Context</div>
                 <table class="popup-table">${lsContent}</table>
+                ${userLocationActions}
+            </div>
+            <div class="popup-credits">Report Generated by <strong>DOST Project LIGTAS-AGAD RIILEWS</strong> (SESAM-UPLB)</div>
+            <div class="popup-actions">
+                <button class="pdf-btn" onclick="downloadPopupPDF(this)">📥 PDF</button>
+                <button class="share-btn" onclick="sharePopupData(this)">📤 Share</button>
+                ${clearBtnHtml}
+            </div>
+        </div>
+    `;
+}
+
+function pointInLeafletPolygon(latlng, polyLayer) {
+    if (!latlng || !polyLayer || !polyLayer.getBounds) return false;
+    try {
+        if (!polyLayer.getBounds().contains(latlng)) return false;
+    } catch(e) { return false; }
+    
+    const lat = latlng.lat, lng = latlng.lng;
+    
+    function rayCast(rings) {
+        if (!rings || !rings.length) return false;
+        if (Array.isArray(rings[0])) {
+            for (let r = 0; r < rings.length; r++) {
+                if (rayCast(rings[r])) return true;
+            }
+            return false;
+        }
+        let inside = false;
+        for (let i = 0, j = rings.length - 1; i < rings.length; j = i++) {
+            const xi = rings[i].lat !== undefined ? rings[i].lat : rings[i][1];
+            const yi = rings[i].lng !== undefined ? rings[i].lng : rings[i][0];
+            const xj = rings[j].lat !== undefined ? rings[j].lat : rings[j][1];
+            const yj = rings[j].lng !== undefined ? rings[j].lng : rings[j][0];
+            const intersect = ((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    try {
+        return rayCast(polyLayer.getLatLngs());
+    } catch (e) {
+        return false;
+    }
+}
+
+function findLandslideSusceptibilityAt(latlng) {
+    if (!latlng) return null;
+    const targetLatLng = L.latLng(latlng);
+    let exactResult = null;
+    let nearestResult = null;
+    let minDistanceKm = 25;
+
+    // 1. Check Synchronized AWS Layers (initSynchronizedAWSLayer)
+    if (typeof synchronizedLayers !== 'undefined' && synchronizedLayers.length > 0) {
+        for (const item of synchronizedLayers) {
+            if (!item.layer) continue;
+            item.layer.eachLayer(fl => {
+                if (exactResult || !fl.getBounds) return;
+                
+                // Test exact polygon containment
+                if (pointInLeafletPolygon(targetLatLng, fl)) {
+                    const p = (fl.feature && fl.feature.properties) ? fl.feature.properties : {};
+                    const lsRating = p['LS'] || p['Landslide '] || p['Landslide'] || p['rating'] || 'High Landslide Susceptibility';
+                    exactResult = {
+                        source: `${item.name}`,
+                        susceptibility: lsRating,
+                        level: String(lsRating).toLowerCase().includes('high') ? 'High' : (String(lsRating).toLowerCase().includes('mod') ? 'Moderate' : 'Low'),
+                        municipality: p['Municipali'] || p['MUNICIPALI'] || '',
+                        barangay: p['Barangay'] || p['BARANGAY'] || ''
+                    };
+                    return;
+                }
+
+                // Centroid distance fallback
+                try {
+                    const center = fl.getBounds().getCenter();
+                    const distKm = targetLatLng.distanceTo(center) / 1000;
+                    if (distKm < minDistanceKm) {
+                        minDistanceKm = distKm;
+                        const p = (fl.feature && fl.feature.properties) ? fl.feature.properties : {};
+                        const lsRating = p['LS'] || p['Landslide '] || p['Landslide'] || p['rating'] || 'High Landslide Susceptibility';
+                        nearestResult = {
+                            source: `${item.name} (~${distKm.toFixed(1)} km)`,
+                            susceptibility: lsRating,
+                            level: String(lsRating).toLowerCase().includes('high') ? 'High' : (String(lsRating).toLowerCase().includes('mod') ? 'Moderate' : 'Low'),
+                            municipality: p['Municipali'] || p['MUNICIPALI'] || '',
+                            barangay: p['Barangay'] || p['BARANGAY'] || ''
+                        };
+                    }
+                } catch(err) {}
+            });
+            if (exactResult) return exactResult;
+        }
+    }
+
+    // 2. Check MGB Susceptibility Overlays (MGB-HIGH, MGB-MED, MGB-LOW)
+    const mgbLayers = [
+        { key: 'MGB-HIGH', name: 'MGB High Susceptibility', defaultRating: 'High Landslide Susceptibility', level: 'High' },
+        { key: 'MGB-MED', name: 'MGB Moderate Susceptibility', defaultRating: 'Moderate Landslide Susceptibility', level: 'Moderate' },
+        { key: 'MGB-LOW', name: 'MGB Low Susceptibility', defaultRating: 'Low Landslide Susceptibility', level: 'Low' }
+    ];
+
+    if (typeof overlays !== 'undefined') {
+        for (const mgb of mgbLayers) {
+            const overlayKey = Object.keys(overlays).find(k => k.includes(mgb.key));
+            const layer = overlayKey ? overlays[overlayKey] : null;
+            if (!layer) continue;
+
+            layer.eachLayer(fl => {
+                if (exactResult || !fl.getBounds) return;
+                if (pointInLeafletPolygon(targetLatLng, fl)) {
+                    const p = (fl.feature && fl.feature.properties) ? fl.feature.properties : {};
+                    exactResult = {
+                        source: mgb.name,
+                        susceptibility: p['rating'] || mgb.defaultRating,
+                        level: mgb.level,
+                        municipality: p['ADM3_EN'] || p['ADM4_EN'] || '',
+                        barangay: p['ADM4_EN'] || ''
+                    };
+                }
+            });
+            if (exactResult) return exactResult;
+        }
+    }
+
+    return nearestResult;
+}
+
+function generateLandslidePointReport(feature, latlng) {
+    const props = (feature && feature.properties) ? feature.properties : {};
+    const normLatLng = L.latLng(latlng);
+
+    // Strictly Year and Location (LANDSLID_2)
+    const year = props['Year'] || props['YYYY-MM-DD'] || props['Month'] || 'Historical Event';
+    const location = props['LANDSLID_2'] || props['BARANGAY'] || props['MUNICIPALI'] || 'Recorded Landslide Location';
+
+    // 1. Nearby AWS Weather Data & Recommended Actions (20km radius)
+    const priorityStation = findPriorityStationNearby(normLatLng, 20);
+    let stationContent = `
+        <tr>
+            <td colspan="2" style="text-align:center; padding:12px; color:#e11d48; font-weight:700; background:rgba(244,63,94,0.06); border-radius:8px;">
+                ❌ No AWS nearby (Out of 20km Coverage Zone)
+            </td>
+        </tr>
+    `;
+    let recActionContent = `
+        <tr><th>Recommended Action</th><td><span style="color:#64748b; font-weight:600;">Monitor Local Weather Advisories</span></td></tr>
+    `;
+
+    if (priorityStation) {
+        const rawWLevel = parseInt(priorityStation.RainfallLandslidethresholdwarninglevel) || 0;
+        const badgeClass = `badge-level-${rawWLevel}`;
+        stationContent = `
+            <tr><th>Nearest Station</th><td><strong>${priorityStation.StationName || priorityStation.Station}</strong></td></tr>
+            <tr><th>Station Distance</th><td><b>${priorityStation.distance} km</b></td></tr>
+            <tr><th>Threshold Warning</th><td><span class="warning-badge ${badgeClass}">${rawWLevel > 0 ? '⚠️ ' : '✅ '}Level ${rawWLevel}</span></td></tr>
+            <tr><th>Rainfall (7-days)</th><td><b>${priorityStation.R24H || priorityStation.Rainfall || '0'}</b> mm</td></tr>
+        `;
+        const actionText = priorityStation.Recommendedactions || (rawWLevel > 0 ? 'Prepare for possible evacuation' : 'Continue routine monitoring');
+        recActionContent = `
+            <tr><th>Recommended Action</th><td><strong style="color:var(--dark-teal); font-weight:700;">${actionText}</strong></td></tr>
+        `;
+    }
+
+    return `
+        <div class="popup-container">
+            <div class="popup-header">Recorded Landslide Incident</div>
+            <div class="popup-scroll-container">
+                <div class="popup-section-title">1. Historical Incident Record</div>
+                <table class="popup-table">
+                    <tr><th>Event Year</th><td><strong style="color:var(--primary-color); font-size:1.1em;">📅 ${year}</strong></td></tr>
+                    <tr><th>Location (LANDSLID_2)</th><td><strong>📍 ${location}</strong></td></tr>
+                    <tr><th>Coordinates</th><td><small>${normLatLng.lat.toFixed(6)}°, ${normLatLng.lng.toFixed(6)}°</small></td></tr>
+                </table>
+
+                <div class="popup-section-title">2. Nearby AWS Weather Status</div>
+                <table class="popup-table">
+                    ${stationContent}
+                    ${recActionContent}
+                </table>
             </div>
             <div class="popup-credits">Report Generated by <strong>DOST Project LIGTAS-AGAD RIILEWS</strong> (SESAM-UPLB)</div>
             <div class="popup-actions">
@@ -550,52 +1604,101 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
                 onEachFeature: (feature, layer) => {
                     if (styleOptions.interactive === false) return; 
 
-                    let popupRows = '';
-                    if (feature.properties) {
-                        for (const [key, value] of Object.entries(feature.properties)) {
-                            const kLower = String(key).toLowerCase().trim();
-                            if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
-                            const displayKey = formatPropertyName(key); let displayValue = formatPropertyValue(key, value);
-                            if (typeof displayValue === 'string' && (displayValue.startsWith('http') || displayValue.startsWith('https') || displayValue.startsWith('www'))) { displayValue = `<a href="${displayValue}" target="_blank" style="color:blue; text-decoration:underline;">View Link</a>`; }
-                            popupRows += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
-                        }
-                    }
                     const displayTitle = styleOptions.customPopupName || name;
-                    
-                    const popupContent = `
-                        <div class="popup-container">
-                            <div class="popup-header">${displayTitle}</div>
-                            <div class="popup-scroll-container">
-                                <table class="popup-table">${popupRows}</table>
+
+                    if (name === 'LIGTAS-LSDB') {
+                        // REVISED LANDSLIDE POPUP: Year + Location LANDSLID_2 + Nearby AWS + Actions
+                        const latlng = layer.getLatLng ? layer.getLatLng() : (feature.geometry && feature.geometry.coordinates ? L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0]) : null);
+                        if (latlng) {
+                            layer.bindPopup(generateLandslidePointReport(feature, latlng), {
+                                autoPan: true,
+                                autoPanPaddingTopLeft: [40, 70],
+                                autoPanPaddingBottomRight: [40, 40],
+                                maxWidth: 360
+                            });
+                        }
+                    } else {
+                        let popupRows = '';
+                        if (feature.properties) {
+                            for (const [key, value] of Object.entries(feature.properties)) {
+                                const kLower = String(key).toLowerCase().trim();
+                                if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
+                                const displayKey = formatPropertyName(key); let displayValue = formatPropertyValue(key, value);
+                                if (typeof displayValue === 'string' && (displayValue.startsWith('http') || displayValue.startsWith('https') || displayValue.startsWith('www'))) { displayValue = `<a href="${displayValue}" target="_blank" style="color:blue; text-decoration:underline;">View Link</a>`; }
+                                popupRows += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
+                            }
+                        }
+                        
+                        const popupContent = `
+                            <div class="popup-container">
+                                <div class="popup-header">${displayTitle}</div>
+                                <div class="popup-scroll-container">
+                                    <table class="popup-table">${popupRows}</table>
+                                </div>
+                                <div class="popup-credits">Report Generated by <strong>DOST Project LIGTAS-AGAD RIILEWS</strong> (SESAM-UPLB)</div>
+                                <div class="popup-actions">
+                                    <button class="pdf-btn" onclick="downloadPopupPDF(this)">📥 PDF</button>
+                                    <button class="share-btn" onclick="sharePopupData(this)">📤 Share</button>
+                                </div>
                             </div>
-                            <div class="popup-credits">Report Generated by <strong>DOST Project LIGTAS-AGAD RIILEWS</strong> (SESAM-UPLB)</div>
-                            <div class="popup-actions">
-                                <button class="pdf-btn" onclick="downloadPopupPDF(this)">📥 PDF</button>
-                                <button class="share-btn" onclick="sharePopupData(this)">📤 Share</button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    layer.bindPopup(popupContent);
+                        `;
+                        
+                        layer.bindPopup(popupContent, {
+                            autoPan: true,
+                            autoPanPaddingTopLeft: [40, 70],
+                            autoPanPaddingBottomRight: [40, 40],
+                            maxWidth: 360
+                        });
+                    }
+
                     layer.on('click', (e) => { 
                         if (e.originalEvent) e.originalEvent._stopped = true;
                         
                         // Highlight selected Barangay / Feature boundary polygon
                         highlightGeoJSONFeature(e.target);
 
-                        updatePropertiesTable(displayTitle, feature.properties);
-                        if (name.includes('MGB') || name.includes('Susceptibility')) {
-                            const priorityStation = findPriorityStationNearby(e.latlng, 20); 
-                            const lsCount = getNearbyLandslideCount(e.latlng, 5); 
-                            const reportContent = generateCombinedReport(displayTitle, feature.properties, priorityStation, lsCount);
-                            L.popup().setLatLng(e.latlng).setContent(reportContent).openOn(map);
+                        if (name === 'LIGTAS-LSDB') {
+                            const clickPt = e.latlng || (layer.getLatLng ? layer.getLatLng() : null);
+                            if (clickPt) {
+                                const freshReport = generateLandslidePointReport(feature, clickPt);
+                                layer.setPopupContent(freshReport);
+
+                                const p = feature.properties || {};
+                                const yr = p['Year'] || p['YYYY-MM-DD'] || 'N/A';
+                                const loc = p['LANDSLID_2'] || 'N/A';
+                                const nearAWS = findPriorityStationNearby(clickPt, 20);
+
+                                const conciseProps = {
+                                    "Incident Type": "Recorded Historical Landslide",
+                                    "Event Year": yr,
+                                    "Location (LANDSLID_2)": loc,
+                                    "Nearest AWS Station": nearAWS ? `${nearAWS.StationName || nearAWS.Station} (${nearAWS.distance} km)` : "None nearby (>20km)",
+                                    "Weather Warning Level": nearAWS ? `Level ${nearAWS.RainfallLandslidethresholdwarninglevel}` : "N/A",
+                                    "Recommended Action": nearAWS ? (nearAWS.Recommendedactions || "Monitor") : "Monitor Local Advisories"
+                                };
+                                updatePropertiesTable("Recorded Landslide Incident", conciseProps);
+                            }
+                        } else {
+                            updatePropertiesTable(displayTitle, feature.properties);
+                            if (name.includes('MGB') || name.includes('Susceptibility')) {
+                                const priorityStation = findPriorityStationNearby(e.latlng, 20); 
+                                const lsCount = getNearbyLandslideCount(e.latlng, 5); 
+                                const reportContent = generateCombinedReport(displayTitle, feature.properties, priorityStation, lsCount);
+                                layer.setPopupContent(reportContent);
+                            }
                         }
+                        focusMapOnPopup(e.latlng);
                     });
                 }
             });
             
             overlays[fullName] = layer;
             if (layerControl) layerControl.addOverlay(layer, fullName);
+
+            if (name === 'LIGTAS-LSDB' && userAssessmentActive && userAssessmentLatLng) {
+                applyLandslide5KmMask(userAssessmentLatLng);
+            }
+
             return layer;
         })
         .catch(error => { console.error(`Error loading ${name}:`, error); return null; });
@@ -606,7 +1709,7 @@ const layerPromises = [
     createGeoJSONLayer('MGB-HIGH', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_High%20Susceptibility.geojson', { color: 'red', fillOpacity: 0.6, weight: 1, customPopupName: 'High Landslide Risk Area' }),
     createGeoJSONLayer('MGB-MED', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Moderate_Susceptibility.geojson', { color: 'yellow', fillOpacity: 0.6 }),
     createGeoJSONLayer('MGB-LOW', 'Susceptibility', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/uRIL_AWS_Low_Susceptibility.geojson', { color: 'green', fillOpacity: 0.6 }),
-    createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.0, weight: 0.5, interactive: false },null),
+    createGeoJSONLayer('PH-Boundary', 'Boundary', 'https://raw.githubusercontent.com/faeldon/philippines-json-maps/refs/heads/master/2023/geojson/country/hires/country.0.1.json', { color: 'white', fillOpacity: 0.0, weight: 0.5, interactive: false }, null),
     createGeoJSONLayer('LIGTAS-AGAD sites', 'Boundary', 'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADsites/refs/heads/main/LIGTAS-AGAD_sites2.geojson', { color: 'white', fillOpacity: 0.0, weight: 0.5, pane: 'siteBoundaries', interactive: false })
 ];
 
@@ -687,19 +1790,53 @@ function initSynchronizedAWSLayer(targetAwsName, geojsonUrl, layerDisplayName) {
                     fillColor: '#808080',  
                     fillOpacity: globalLayerOpacity 
                 }, 
-                onEachFeature: (feature, layer) => { 
-                    layer.bindPopup(`<b>${layerDisplayName}</b><br>Awaiting AWS synchronization...`); 
-                    layer.on('click', (e) => {
-                        if (e.originalEvent) e.originalEvent._stopped = true;
+                onEachFeature: (feature, featureLayer) => { 
+                    const featureProps = (feature && feature.properties) ? feature.properties : {};
+                    const initialReport = generateCombinedReport(
+                        layerDisplayName,
+                        featureProps,
+                        null,
+                        0,
+                        true
+                    );
+                    featureLayer.bindPopup(initialReport, {
+                        autoPan: false,
+                        maxWidth: 360
+                    }); 
+                    featureLayer.on('click', (e) => {
+                        if (e) {
+                            if (e.originalEvent) {
+                                e.originalEvent._stopped = true;
+                                L.DomEvent.stopPropagation(e.originalEvent);
+                            }
+                            L.DomEvent.stopPropagation(e);
+                        }
                         highlightGeoJSONFeature(e.target);
+                        updatePropertiesTable(layerDisplayName, featureProps);
+                        const clickLatLng = (e && e.latlng) ? e.latlng : (featureLayer.getBounds ? featureLayer.getBounds().getCenter() : (featureLayer.getLatLng ? featureLayer.getLatLng() : null));
+                        if (clickLatLng) {
+                            const nearStation = findPriorityStationNearby(clickLatLng, 20);
+                            const currentLs = getNearbyLandslideCount(clickLatLng, 5);
+                            const freshReport = generateCombinedReport(layerDisplayName, featureProps, nearStation, currentLs, true);
+                            featureLayer.setPopupContent(freshReport);
+                            featureLayer.openPopup(clickLatLng);
+                            focusMapOnPopup(clickLatLng);
+                        } else {
+                            featureLayer.openPopup();
+                        }
                     });
                 }
             }).addTo(map);
 
-            synchronizedLayers.push({ targetAws: targetAwsName, layer: layer, name: layerDisplayName });
+            const layerItem = { targetAws: targetAwsName, layer: layer, name: layerDisplayName };
+            synchronizedLayers.push(layerItem);
             overlays[layerDisplayName] = layer;
-            if(layerControl) layerControl.addOverlay(layer, layerDisplayName);
-            if (typeof initSidebarControls === 'function') initSidebarControls();
+            if (layerControl) layerControl.addOverlay(layer, layerDisplayName);
+
+            // Trigger sync immediately if AWS data has already arrived
+            if (typeof cachedAWSData !== 'undefined' && cachedAWSData && cachedAWSData.length > 0) {
+                syncSingleAwsLayer(layerItem);
+            }
         })
         .catch(err => console.error(`Error loading synced layer ${layerDisplayName}:`, err));
 }
@@ -734,6 +1871,12 @@ const awsSyncPromises = [
 ];
 
 Promise.allSettled(awsSyncPromises).then(() => {
+    if (typeof cachedAWSData !== 'undefined' && cachedAWSData && cachedAWSData.length > 0) {
+        syncAwsLayersWithData();
+    }
+    if (typeof initSidebarControls === 'function') {
+        initSidebarControls();
+    }
     const syncPanel = document.getElementById('aws-sync-panel');
     if (syncPanel) {
         const spinner = syncPanel.querySelector('.sync-spinner');
@@ -747,76 +1890,113 @@ Promise.allSettled(awsSyncPromises).then(() => {
     }
 });
 
+function syncSingleAwsLayer(layerData) {
+    if (!cachedAWSData || cachedAWSData.length === 0 || !layerData || !layerData.layer) return;
+
+    const matchingStations = cachedAWSData.filter(s => {
+        const sName = String(s.StationName || s.Station || '').toLowerCase();
+        return sName.includes(layerData.targetAws.toLowerCase());
+    });
+
+    let station = null;
+    let warningLevel = 0; 
+
+    if (matchingStations.length > 0) {
+        matchingStations.sort((a, b) => {
+            const levelA = parseInt(String(a.RainfallLandslidethresholdwarninglevel).trim()) || 0;
+            const levelB = parseInt(String(b.RainfallLandslidethresholdwarninglevel).trim()) || 0;
+            return levelB - levelA; 
+        });
+        station = matchingStations[0];
+    }
+
+    let targetColor = '#808080';
+    if (station) {
+        const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
+        warningLevel = parseInt(rawLevel) || 0; 
+        if (warningLevel === 1) targetColor = 'yellow'; 
+        else if (warningLevel === 2) targetColor = 'orange'; 
+        else if (warningLevel === 3) targetColor = 'red'; 
+        else if (warningLevel === 0 || rawLevel === '0') targetColor = 'transparent'; 
+    }
+
+    layerData.layer.setStyle({ 
+        color: '#2c3e50',                
+        fillColor: targetColor,          
+        fillOpacity: globalLayerOpacity, 
+        weight: 1.5,                     
+        opacity: 0.9                     
+    });
+    layerData.currentLevel = warningLevel;
+    
+    layerData.layer.eachLayer(featureLayer => {
+        let centerLatLng;
+        if (featureLayer.getBounds) { centerLatLng = featureLayer.getBounds().getCenter(); } 
+        else if (featureLayer.getLatLng) { centerLatLng = featureLayer.getLatLng(); }
+
+        let lsCount = 0;
+        let finalStationDisplay = station ? { ...station, distance: "0.00" } : null;
+
+        if (centerLatLng) {
+            lsCount = getNearbyLandslideCount(centerLatLng, 5); 
+            const priorityNearbyStation = findPriorityStationNearby(centerLatLng, 20);
+
+            if (priorityNearbyStation) {
+                finalStationDisplay = priorityNearbyStation;
+            } else if (station) {
+                const stLat = parseFloat(station.Latitude); const stLng = parseFloat(station.Longitude);
+                if (!isNaN(stLat) && !isNaN(stLng)) {
+                    const stationLatLng = L.latLng(stLat, stLng);
+                    finalStationDisplay.distance = (centerLatLng.distanceTo(stationLatLng) / 1000).toFixed(2);
+                }
+            }
+        }
+
+        const featureProps = (featureLayer.feature && featureLayer.feature.properties) ? featureLayer.feature.properties : {};
+        const reportContent = generateCombinedReport(
+            layerData.name, 
+            featureProps, 
+            finalStationDisplay, 
+            lsCount,
+            true
+        );
+
+        featureLayer.bindPopup(reportContent, {
+            autoPan: false,
+            maxWidth: 360
+        }); 
+        
+        featureLayer.off('click');
+        featureLayer.on('click', (e) => {
+            if (e) {
+                if (e.originalEvent) {
+                    e.originalEvent._stopped = true;
+                    L.DomEvent.stopPropagation(e.originalEvent);
+                }
+                L.DomEvent.stopPropagation(e);
+            }
+            highlightGeoJSONFeature(e.target);
+            updatePropertiesTable(layerData.name, featureProps);
+            const clickLatLng = (e && e.latlng) ? e.latlng : (featureLayer.getBounds ? featureLayer.getBounds().getCenter() : (featureLayer.getLatLng ? featureLayer.getLatLng() : null));
+            if (clickLatLng) {
+                const currentNearStation = findPriorityStationNearby(clickLatLng, 20) || finalStationDisplay;
+                const currentLsCount = getNearbyLandslideCount(clickLatLng, 5);
+                const freshReport = generateCombinedReport(layerData.name, featureProps, currentNearStation, currentLsCount, true);
+                featureLayer.setPopupContent(freshReport);
+                featureLayer.openPopup(clickLatLng);
+                focusMapOnPopup(clickLatLng);
+            } else {
+                featureLayer.openPopup();
+            }
+        });
+    });
+}
+
 function syncAwsLayersWithData() {
     if (!cachedAWSData || cachedAWSData.length === 0) return;
     
     synchronizedLayers.forEach(layerData => {
-        const matchingStations = cachedAWSData.filter(s => {
-            const sName = String(s.StationName || s.Station || '').toLowerCase();
-            return sName.includes(layerData.targetAws.toLowerCase());
-        });
-
-        let station = null;
-        let warningLevel = 0; 
-
-        if (matchingStations.length > 0) {
-            matchingStations.sort((a, b) => {
-                const levelA = parseInt(String(a.RainfallLandslidethresholdwarninglevel).trim()) || 0;
-                const levelB = parseInt(String(b.RainfallLandslidethresholdwarninglevel).trim()) || 0;
-                return levelB - levelA; 
-            });
-            station = matchingStations[0];
-        }
-
-        if (station) {
-            const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
-            warningLevel = parseInt(rawLevel) || 0; 
-            let targetColor = '#808080'; 
-            
-            if (warningLevel === 1) targetColor = 'yellow'; 
-            else if (warningLevel === 2) targetColor = 'orange'; 
-            else if (warningLevel === 3) targetColor = 'red'; 
-            else if (warningLevel === 0 || rawLevel === '0') targetColor = 'transparent'; 
-            
-            layerData.layer.setStyle({ 
-                color: '#2c3e50',                
-                fillColor: targetColor,          
-                fillOpacity: globalLayerOpacity, 
-                weight: 1.5,                     
-                opacity: 0.9                     
-            });
-            layerData.currentLevel = warningLevel;
-            
-            layerData.layer.eachLayer(featureLayer => {
-                let centerLatLng;
-                if (featureLayer.getBounds) { centerLatLng = featureLayer.getBounds().getCenter(); } 
-                else if (featureLayer.getLatLng) { centerLatLng = featureLayer.getLatLng(); }
-
-                let lsCount = 0;
-                let finalStationDisplay = { ...station, distance: "Unknown" };
-
-                if (centerLatLng) {
-                    lsCount = getNearbyLandslideCount(centerLatLng, 5); 
-                    const priorityNearbyStation = findPriorityStationNearby(centerLatLng, 20);
-
-                    if (priorityNearbyStation) {
-                        finalStationDisplay = priorityNearbyStation;
-                    } else {
-                        const stLat = parseFloat(station.Latitude); const stLng = parseFloat(station.Longitude);
-                        if (!isNaN(stLat) && !isNaN(stLng)) {
-                            const stationLatLng = L.latLng(stLat, stLng);
-                            finalStationDisplay.distance = (centerLatLng.distanceTo(stationLatLng) / 1000).toFixed(2);
-                        }
-                    }
-                }
-
-                const reportContent = generateCombinedReport(layerData.name, featureLayer.feature.properties || {}, finalStationDisplay, lsCount);
-                featureLayer.bindPopup(reportContent); 
-                featureLayer.off('popupopen').on('popupopen', () => { updatePropertiesTable(layerData.name, featureLayer.feature.properties || {}); });
-            });
-        } else {
-            layerData.currentLevel = 0;
-        }
+        syncSingleAwsLayer(layerData);
     });
 
     synchronizedLayers.sort((a, b) => (a.currentLevel || 0) - (b.currentLevel || 0));
@@ -1053,8 +2233,16 @@ function processAWSData(data) {
                     </div>
                 </div>`;
             
-            marker.bindPopup(popupContent);
-            marker.on('click', () => { updatePropertiesTable("AWS Station", station); });
+            marker.bindPopup(popupContent, {
+                autoPan: true,
+                autoPanPaddingTopLeft: [40, 70],
+                autoPanPaddingBottomRight: [40, 40],
+                maxWidth: 360
+            });
+            marker.on('click', () => { 
+                updatePropertiesTable("AWS Station", station); 
+                focusMapOnPopup(marker.getLatLng(), 14);
+            });
             warningLayerGroup.addLayer(marker);
         } catch (err) { console.error("Error processing station:", station.StationName, err); }
     });
@@ -1086,7 +2274,7 @@ const geojsonUrls = [
 ];
 const colors = ['yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow', 'orange', 'red', 'yellow'];
 const rasterForecastUrls = [
-    'https://raw.githubusercontent.com/Gabzrock/GE_experiments/refs/heads/main/ligtas_postwrf_d01_20230706_0000_f14300_rain_clipped.geojson',
+    'https://placehold.co/800x600?text=Rainfall+Raster+Day+1',
     'https://placehold.co/800x600?text=Rainfall+Raster+Day+2', 'https://placehold.co/800x600?text=Rainfall+Raster+Day+3', 'https://placehold.co/800x600?text=Rainfall+Raster+Day+4', 'https://placehold.co/800x600?text=Rainfall+Raster+Day+5', 'https://placehold.co/800x600?text=Rainfall+Raster+Day+6', 'https://placehold.co/800x600?text=Rainfall+Raster+Day+7', 'https://placehold.co/800x600?text=Rainfall+Raster+Day+8', 'https://placehold.co/800x600?text=Rainfall+Raster+Day+9', 'https://placehold.co/800x600?text=Rainfall+Raster+Day+10'
 ];
 
@@ -1107,7 +2295,7 @@ function updateRaster(index) {
     if (!showRaster) { if (currentRasterLayer) { map.removeLayer(currentRasterLayer); currentRasterLayer = null; } return; }
     if (currentRasterLayer) map.removeLayer(currentRasterLayer);
     const imageUrl = rasterForecastUrls[index % rasterForecastUrls.length];
-    currentRasterLayer = L.imageOverlay(imageUrl, rasterBounds, { opacity: 0.6, interactive: true, attribution: 'Rainfall Raster Forecast' });
+    currentRasterLayer = L.imageOverlay(imageUrl, rasterBounds, { opacity: 0.6, interactive: false, attribution: 'Rainfall Raster Forecast' });
     currentRasterLayer.on('error', function() { console.warn(`Raster image failed to load: ${imageUrl}`); });
     currentRasterLayer.addTo(map);
 }
@@ -1121,7 +2309,43 @@ function showGroup(groupIndex) {
         fetch(url).then(res => res.json()).then(data => {
             const layer = L.geoJSON(data, {
                 style: { color: colors[i], weight: 2, opacity: 0.7 },
-                onEachFeature: (feature, layer) => { layer.on('click', (e) => { L.DomEvent.stopPropagation(e); updatePropertiesTable("PAGASA-WRF (layer " + (groupIndex + 1) + ")", feature.properties); }); }
+                onEachFeature: (feature, featLayer) => {
+                    const props = feature.properties || {};
+                    const rainVal = props.rainfall_mm || props.Rainfall || props.rain || '10 - 25';
+                    const forecastPopup = `
+                        <div class="popup-container">
+                            <div class="popup-header">🌧️ WRF Rainfall Hazard Layer (Day ${groupIndex + 1})</div>
+                            <div class="popup-scroll-container">
+                                <div class="popup-section-title">Rainfall Forecast</div>
+                                <table class="popup-table">
+                                    <tr><th>Model</th><td>PAGASA-WRF Forecast Model</td></tr>
+                                    <tr><th>Forecast Day</th><td>Day ${groupIndex + 1}</td></tr>
+                                    <tr><th>Estimated Precipitation</th><td><b>${rainVal}</b> mm</td></tr>
+                                    <tr><th>Status</th><td>Active Forecast Layer</td></tr>
+                                </table>
+                            </div>
+                            <div class="popup-credits">DOST Project LIGTAS-AGAD RIILEWS</div>
+                        </div>
+                    `;
+                    featLayer.bindPopup(forecastPopup, { autoPan: false, maxWidth: 360 });
+                    featLayer.on('click', (e) => { 
+                        if (e) {
+                            if (e.originalEvent) {
+                                e.originalEvent._stopped = true;
+                                L.DomEvent.stopPropagation(e.originalEvent);
+                            }
+                            L.DomEvent.stopPropagation(e);
+                        }
+                        updatePropertiesTable("PAGASA-WRF (Day " + (groupIndex + 1) + ")", props);
+                        const clickPt = (e && e.latlng) ? e.latlng : (featLayer.getBounds ? featLayer.getBounds().getCenter() : null);
+                        if (clickPt) {
+                            featLayer.openPopup(clickPt);
+                            if (typeof focusMapOnPopup === 'function') focusMapOnPopup(clickPt);
+                        } else {
+                            featLayer.openPopup();
+                        }
+                    }); 
+                }
             }).addTo(map);
             forecastLayers.push(layer);
         }).catch(err => console.log('Forecast data missing'));
@@ -1151,6 +2375,8 @@ const sBtn = document.getElementById('stopBtn'); if(sBtn) sBtn.onclick = () => {
 const nBtn = document.getElementById('nextBtn'); if(nBtn) nBtn.onclick = () => { stopAnimation(); currentGroupIndex = (currentGroupIndex + 1) % 10; showGroup(currentGroupIndex); };
 const prBtn = document.getElementById('prevBtn'); if(prBtn) prBtn.onclick = () => { stopAnimation(); currentGroupIndex = (currentGroupIndex - 1 + 10) % 10; showGroup(currentGroupIndex); };
 
+let isGlobalSidebarSyncBound = false;
+
 function initSidebarControls() {
     const container = document.getElementById('layerControls');
     if (!container) return;
@@ -1159,11 +2385,21 @@ function initSidebarControls() {
     function createToggle(id, label, layerObj, onChangeOverride) {
         const div = document.createElement('div'); div.className = 'layer-item';
         const input = document.createElement('input'); input.type = 'checkbox'; input.id = id; input.className = 'layer-toggle-input';
+        input.dataset.layerLabel = label;
         
         if (layerObj) { input.checked = map.hasLayer(layerObj); }
         input.onchange = (e) => { 
             if (onChangeOverride) { onChangeOverride(e.target.checked); } 
-            else if (layerObj) { e.target.checked ? map.addLayer(layerObj) : map.removeLayer(layerObj); }
+            else if (layerObj) { 
+                if (e.target.checked) {
+                    map.addLayer(layerObj);
+                    if (label.includes('LIGTAS-LSDB') || label.includes('MGB') || label.includes('Susceptibility')) {
+                        setVisualEffects(false, true);
+                    }
+                } else {
+                    map.removeLayer(layerObj);
+                }
+            }
         };
 
         const lbl = document.createElement('label'); lbl.htmlFor = id; lbl.innerText = label;
@@ -1173,20 +2409,31 @@ function initSidebarControls() {
 
     Object.keys(overlays).forEach((name, idx) => {
         const layer = overlays[name];
-        const input = createToggle('toggle_overlay_' + idx, name, layer);
-        map.on('layeradd', (e) => { if(e.layer === layer) input.checked = true; });
-        map.on('layerremove', (e) => { if(e.layer === layer) input.checked = false; });
+        createToggle('toggle_overlay_' + idx, name, layer);
     });
 
-    const warnInput = createToggle('toggle_warning', '20-KM Warning & AWS', warningLayerGroup);
-    map.on('layeradd', (e) => { if(e.layer === warningLayerGroup) warnInput.checked = true; });
-    map.on('layerremove', (e) => { if(e.layer === warningLayerGroup) warnInput.checked = false; });
+    createToggle('toggle_warning', '20-KM Warning & AWS', warningLayerGroup);
 
     createToggle('toggle_raster', 'Show Raster Forecast', null, (checked) => {
         showRaster = checked;
         if (checked) updateRaster(currentGroupIndex); 
         else if (currentRasterLayer) map.removeLayer(currentRasterLayer);
     });
+
+    if (!isGlobalSidebarSyncBound && map) {
+        isGlobalSidebarSyncBound = true;
+        const syncCheckboxes = () => {
+            document.querySelectorAll('.layer-toggle-input').forEach(input => {
+                const label = input.dataset.layerLabel || (input.nextElementSibling ? input.nextElementSibling.innerText : '');
+                if (label === '20-KM Warning & AWS' && typeof warningLayerGroup !== 'undefined') {
+                    input.checked = map.hasLayer(warningLayerGroup);
+                } else if (label && typeof overlays !== 'undefined' && overlays[label]) {
+                    input.checked = map.hasLayer(overlays[label]);
+                }
+            });
+        };
+        map.on('layeradd layerremove', syncCheckboxes);
+    }
 }
 
 // ==========================================
@@ -1231,23 +2478,16 @@ const assessLocationBtn = document.getElementById('assessLocationBtn');
 if (assessLocationBtn) {
     assessLocationBtn.addEventListener('click', function(e) {
         e.preventDefault();
-        if (map) { showLoadingScreen("Acquiring GPS Signal..."); map.locate({setView: true, maxZoom: 16, timeout: 10000}); }
+        assessUserLocation();
     });
 }
 
 const toggleEffectsBtn = document.getElementById('toggleEffectsBtn');
 if (toggleEffectsBtn) {
     toggleEffectsBtn.addEventListener('click', () => {
-        const body = document.body;
-        body.classList.toggle('disable-effects');
-        
-        if (body.classList.contains('disable-effects')) {
-            toggleEffectsBtn.innerText = '✨ Enable Effects';
-            toggleEffectsBtn.classList.add('btn-warning');
-        } else {
-            toggleEffectsBtn.innerText = '✨ Disable Effects';
-            toggleEffectsBtn.classList.remove('btn-warning');
-        }
+        const isEffectsCurrentlyDisabled = document.body.classList.contains('disable-effects');
+        // If currently disabled, clicking it enables visual effects (which auto-disables heavy landslide layers)
+        setVisualEffects(isEffectsCurrentlyDisabled, true);
     });
 }
 
@@ -1278,6 +2518,14 @@ if (defaultLayersBtn) {
             if (isDefault && !input.checked) input.click();
             if (!isDefault && input.checked) input.click();
         });
+    });
+}
+
+// --- RESET MAP VIEW BUTTON ---
+const resetMapViewBtn = document.getElementById('resetMapViewBtn');
+if (resetMapViewBtn) {
+    resetMapViewBtn.addEventListener('click', () => {
+        resetMapView();
     });
 }
 
@@ -1841,3 +3089,105 @@ if (toggleAutoAlertsBtn) {
         }
     };
 }
+
+// =========================================================
+// 15. AUTOMATED ONBOARDING LOCATION PROMPT & PERFORMANCE UI
+// =========================================================
+const locationPromptModal = document.getElementById('locationPromptModal');
+const promptAssessBtn = document.getElementById('promptAssessBtn');
+const promptBrowseBtn = document.getElementById('promptBrowseBtn');
+const closeLocationPromptBtn = document.getElementById('closeLocationPromptBtn');
+const promptLandslideToggle = document.getElementById('promptLandslideToggle');
+const promptEffectsToggle = document.getElementById('promptEffectsToggle');
+const promptPerfNotice = document.getElementById('promptPerfNotice');
+
+function updatePromptNotice() {
+    if (!promptPerfNotice) return;
+    const landslideActive = promptLandslideToggle ? promptLandslideToggle.checked : false;
+    const effectsActive = promptEffectsToggle ? promptEffectsToggle.checked : false;
+
+    if (landslideActive) {
+        promptPerfNotice.innerHTML = '⚡ <strong>Performance Optimized:</strong> Visual effects are automatically disabled when Landslide Data is active to eliminate map lag.';
+        promptPerfNotice.style.borderLeftColor = 'var(--primary-color, #008080)';
+    } else if (effectsActive) {
+        promptPerfNotice.innerHTML = '✨ <strong>Visual Effects Active:</strong> Landslide hazard layers are disabled to ensure smooth 60fps animations.';
+        promptPerfNotice.style.borderLeftColor = '#e67e22';
+    } else {
+        promptPerfNotice.innerHTML = '💡 <strong>Lightweight Mode:</strong> Heavy landslide polygons and animations are disabled for maximum performance.';
+        promptPerfNotice.style.borderLeftColor = '#64748b';
+    }
+}
+window.updatePromptNotice = updatePromptNotice;
+
+if (promptLandslideToggle) {
+    promptLandslideToggle.addEventListener('change', (e) => {
+        if (e.target.checked && promptEffectsToggle) {
+            promptEffectsToggle.checked = false;
+        }
+        updatePromptNotice();
+    });
+}
+
+if (promptEffectsToggle) {
+    promptEffectsToggle.addEventListener('change', (e) => {
+        if (e.target.checked && promptLandslideToggle) {
+            promptLandslideToggle.checked = false;
+        }
+        updatePromptNotice();
+    });
+}
+
+function applyPromptSettings(includeLSDB = false) {
+    const enableLandslide = promptLandslideToggle ? promptLandslideToggle.checked : true;
+    const enableEffects = promptEffectsToggle ? promptEffectsToggle.checked : false;
+
+    if (enableLandslide) {
+        setLandslideData(true, false, includeLSDB);
+    } else if (enableEffects) {
+        setVisualEffects(true, false);
+    } else {
+        setLandslideData(false, false, false);
+        setVisualEffects(false, false);
+    }
+}
+
+if (promptAssessBtn) {
+    promptAssessBtn.addEventListener('click', () => {
+        applyPromptSettings(true);
+        dismissLocationPrompt();
+        assessUserLocation();
+    });
+}
+
+if (promptBrowseBtn) {
+    promptBrowseBtn.addEventListener('click', () => {
+        // Hide the landslide points LSDB by default when user clicks to continue browsing map to reduce map lag
+        applyPromptSettings(false);
+        hideLandslidePointsLSDB();
+        dismissLocationPrompt();
+    });
+}
+
+if (closeLocationPromptBtn) {
+    closeLocationPromptBtn.addEventListener('click', () => {
+        applyPromptSettings(false);
+        hideLandslidePointsLSDB();
+        dismissLocationPrompt();
+    });
+}
+
+window.addEventListener('click', (e) => {
+    if (e.target === locationPromptModal) {
+        applyPromptSettings(false);
+        hideLandslidePointsLSDB();
+        dismissLocationPrompt();
+    }
+});
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && locationPromptModal && locationPromptModal.style.display === 'flex') {
+        applyPromptSettings(false);
+        hideLandslidePointsLSDB();
+        dismissLocationPrompt();
+    }
+});
