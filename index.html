@@ -67,7 +67,7 @@
             <div class="button-group-container">
                 <span class="group-label">TOOLS</span>
                 <div class="button-pod">
-                    <button class="nav-btn btn-warning" id="assessLocationBtn" title="GPS Proximity Landslide Radar (5km Radius)">📡 GPS PROXIMITY LANDSLIDE RADAR</button>
+                    <button class="nav-btn btn-warning" id="assessLocationBtn" title="GPS Proximity Landslide Radar (3km Buffer)">📡 GPS PROXIMITY LANDSLIDE RADAR</button>
                      <button class="nav-btn" onclick="window.open('https://script.google.com/macros/s/AKfycbz5_G7ghXnc_k1vPKDVZA4VTCvf57YpK4PxULBT0GJM6Jhd_EBxObg4a2-EZkNSct8/exec', '_blank')">Detect Landslides</button>
                 </div>
             </div>
@@ -100,6 +100,46 @@
 
     <div class="map-panel-container">
         <div id="map"></div>
+        
+        <!-- 3KM Tactical Proximity Radar HUD Widget (Guided Screenshot Replication) -->
+        <div id="radarTacticalHud" class="radar-tactical-hud" style="display: none;">
+            <div class="hud-radar-icon">
+                <svg viewBox="0 0 40 40" class="hud-radar-svg">
+                    <circle cx="20" cy="20" r="17" fill="none" stroke="#eab308" stroke-width="1.6" stroke-dasharray="3,2"/>
+                    <circle cx="20" cy="20" r="11" fill="none" stroke="#eab308" stroke-width="1.2" stroke-dasharray="2,2"/>
+                    <circle cx="20" cy="20" r="5" fill="none" stroke="#eab308" stroke-width="1"/>
+                    <circle cx="20" cy="20" r="2.5" fill="#facc15"/>
+                    <line x1="20" y1="3" x2="20" y2="37" stroke="rgba(234, 179, 8, 0.5)" stroke-width="1"/>
+                    <line x1="3" y1="20" x2="37" y2="20" stroke="rgba(234, 179, 8, 0.5)" stroke-width="1"/>
+                    <path d="M20 20 L32 8 A17 17 0 0 0 20 3 Z" fill="rgba(234, 179, 8, 0.35)"/>
+                </svg>
+            </div>
+            <div class="hud-info-section">
+                <div class="hud-header-row">
+                    <span class="hud-title">3 KM PROXIMITY SCAN</span>
+                    <span class="hud-active-badge">EXTENT ACTIVE</span>
+                </div>
+                <div class="hud-count-row">
+                    <span id="hudLsCount" class="hud-count">0</span>
+                    <span class="hud-count-label">Landslides within 3 km</span>
+                </div>
+                <div id="hudClosestRow" class="hud-closest-row">
+                    Closest: --
+                </div>
+            </div>
+            <div class="hud-actions-section">
+                <button id="hud3kmZoneBtn" class="hud-btn hud-btn-gold" type="button" title="Fit map view to 3km radar perimeter">
+                    🎯 3km Zone
+                </button>
+                <button id="hud3kmOnlyBtn" class="hud-btn hud-btn-gold" type="button" title="Toggle 3km filter only">
+                    3km Only: ON
+                </button>
+                <button id="hudCloseBtn" class="hud-close-btn" type="button" title="Clear Radar Assessment">
+                    ✕
+                </button>
+            </div>
+        </div>
+
         <div id="errorOverride" class="map-floating-notice info" role="alert" aria-live="polite">
             <span class="notice-icon" id="errorIcon">ℹ️</span>
             <span id="errorMessage"></span>
@@ -323,7 +363,7 @@
             </div>
             <h3 id="locationPromptTitle" class="location-prompt-title">GPS PROXIMITY LANDSLIDE RADAR</h3>
             <p class="location-prompt-subtitle">
-                Scan and detect historical landslides and synchronized AWS weather hazards within a 5km proximity buffer radius of your current location.
+                Scan and detect historical landslides and synchronized AWS weather hazards within a 3km proximity buffer radius of your current location.
             </p>
 
             <!-- System Performance & Map Data Configuration -->
