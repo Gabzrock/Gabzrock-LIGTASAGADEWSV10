@@ -90,14 +90,17 @@ function showLoadingScreen(customMessage) {
 let hasPromptedLocation = false;
 let userLocationMarker = null;
 let userAccuracyCircle = null;
-let user5KmBufferCircle = null;
+let user5KmBufferCircle = null; // Reference alias for backward compatibility
+let user3KmBufferCircle = null;
 let userRadarRangeRing = null;
 let detectedLandslidePingsGroup = null;
 let radarNearbyLandslidesGroup = null;
+let radarTacticalGroup = null; // LayerGroup for 1km, 2km, 3km circles, crosshairs, labels, callout
 let userAssessmentActive = false;
 let userAssessmentLatLng = null;
 let isLandslide5KmMaskActive = false;
 let isGpsLocating = false;
+let currentRadarUserReportContent = null;
 
 // Safe global overlay dictionary
 var overlays = overlays || {};
@@ -108,23 +111,110 @@ function getLandslidesLayer() {
     return key ? overlays[key] : null;
 }
 
-function applyLandslide5KmMask(centerLatLng) {
+function updateTacticalRadarSweepSize() {
+    if (!map || !userAssessmentLatLng) return;
+    const sweepEl = document.getElementById('tacticalRadarSweepEl');
+    const boxEl = document.getElementById('tacticalRadarOuterBox');
+    if (!sweepEl && !boxEl) return;
+
+    try {
+        const centerPt = map.latLngToLayerPoint(userAssessmentLatLng);
+        const cosLat = Math.cos(userAssessmentLatLng.lat * Math.PI / 180);
+        const lngOffset3km = 3000 / (111139 * (cosLat || 1));
+        const eastLatLng = L.latLng(userAssessmentLatLng.lat, userAssessmentLatLng.lng + lngOffset3km);
+        const eastPt = map.latLngToLayerPoint(eastLatLng);
+        const radiusPx = Math.round(Math.hypot(eastPt.x - centerPt.x, eastPt.y - centerPt.y));
+        const diameterPx = radiusPx * 2;
+
+        if (sweepEl) {
+            sweepEl.style.width = diameterPx + 'px';
+            sweepEl.style.height = diameterPx + 'px';
+            sweepEl.style.marginLeft = (-radiusPx) + 'px';
+            sweepEl.style.marginTop = (-radiusPx) + 'px';
+        }
+        if (boxEl) {
+            const boxSize = Math.round(diameterPx * 1.05);
+            boxEl.style.width = boxSize + 'px';
+            boxEl.style.height = boxSize + 'px';
+            boxEl.style.marginLeft = (-boxSize / 2) + 'px';
+            boxEl.style.marginTop = (-boxSize / 2) + 'px';
+        }
+    } catch (err) {
+        console.warn('Error updating tactical radar sweep size:', err);
+    }
+}
+
+function updateTacticalHud(visibleCount, closestDistMeters, closestFeature) {
+    const hud = document.getElementById('radarTacticalHud');
+    if (!hud) return;
+    hud.style.display = 'flex';
+
+    const countEl = document.getElementById('hudLsCount');
+    if (countEl) countEl.innerText = visibleCount;
+
+    const closestEl = document.getElementById('hudClosestRow');
+    if (closestEl) {
+        if (visibleCount > 0 && closestDistMeters < Infinity) {
+            const km = (closestDistMeters / 1000).toFixed(2);
+            const p = closestFeature ? (closestFeature.properties || {}) : {};
+            const loc = p['LANDSLID_2'] || p['Location'] || p['Barangay'] || 'Landslide';
+            const locTrunc = loc.length > 18 ? loc.substring(0, 16) + '...' : loc;
+            closestEl.innerText = `Closest: ${km} km (${locTrunc})`;
+            closestEl.title = `Closest Landslide: ${km} km - ${loc}`;
+        } else {
+            closestEl.innerText = 'No landslides within 3 km';
+            closestEl.title = 'No historical landslides detected within 3km proximity';
+        }
+    }
+
+    const maskBtn = document.getElementById('hud3kmOnlyBtn');
+    if (maskBtn) {
+        maskBtn.innerText = `3km Only: ${isLandslide5KmMaskActive ? 'ON' : 'OFF'}`;
+    }
+}
+
+function initTacticalHudControls() {
+    const zoneBtn = document.getElementById('hud3kmZoneBtn');
+    if (zoneBtn) {
+        zoneBtn.onclick = (e) => {
+            if (e) e.stopPropagation();
+            fitTo3KmBuffer();
+        };
+    }
+    const maskBtn = document.getElementById('hud3kmOnlyBtn');
+    if (maskBtn) {
+        maskBtn.onclick = (e) => {
+            if (e) e.stopPropagation();
+            toggleLandslideMask();
+        };
+    }
+    const closeBtn = document.getElementById('hudCloseBtn');
+    if (closeBtn) {
+        closeBtn.onclick = (e) => {
+            if (e) e.stopPropagation();
+            clearUserLocationAssessment();
+        };
+    }
+}
+
+function applyLandslide3KmMask(centerLatLng) {
     if (!centerLatLng) return;
     const normCenter = L.latLng(centerLatLng);
     userAssessmentActive = true;
     userAssessmentLatLng = normCenter;
     isLandslide5KmMaskActive = true;
 
+    initTacticalHudControls();
+
     const lsLayer = getLandslidesLayer();
 
-    // PERFORMANCE & WEBKIT CRASH FIX:
-    // Do NOT render all 8,000 regional markers to the map while 5km proximity radar is active.
-    // Removing the 8,000-marker regional layer frees up memory and prevents WebKit SVG invalidation crashes.
+    // PERFORMANCE & WEBKIT OPTIMIZATION:
+    // Keep nationwide 8,000-marker layer off the map while 3km proximity radar is active.
     if (lsLayer && map && map.hasLayer(lsLayer)) {
         map.removeLayer(lsLayer);
     }
 
-    // Initialize or reset the dedicated nearby landslide layer group
+    // Reset nearby landslides group
     if (!radarNearbyLandslidesGroup && map) {
         radarNearbyLandslidesGroup = L.layerGroup().addTo(map);
     } else if (radarNearbyLandslidesGroup) {
@@ -134,17 +224,19 @@ function applyLandslide5KmMask(centerLatLng) {
         }
     }
 
-    // Initialize or reset the detected radar pings layer group
-    if (!detectedLandslidePingsGroup && map) {
-        detectedLandslidePingsGroup = L.layerGroup().addTo(map);
-    } else if (detectedLandslidePingsGroup) {
-        detectedLandslidePingsGroup.clearLayers();
-        if (map && !map.hasLayer(detectedLandslidePingsGroup)) {
-            detectedLandslidePingsGroup.addTo(map);
+    // Reset tactical radar group (1km, 2km, 3km circles, crosshairs, labels, callout)
+    if (!radarTacticalGroup && map) {
+        radarTacticalGroup = L.layerGroup().addTo(map);
+    } else if (radarTacticalGroup) {
+        radarTacticalGroup.clearLayers();
+        if (map && !map.hasLayer(radarTacticalGroup)) {
+            radarTacticalGroup.addTo(map);
         }
     }
 
     let visibleCount = 0;
+    let closestDistMeters = Infinity;
+    let closestFeature = null;
 
     // Retrieve features either from landslideFeatures array or GeoJSON layer
     const candidateFeatures = (typeof landslideFeatures !== 'undefined' && landslideFeatures && landslideFeatures.length > 0)
@@ -158,18 +250,24 @@ function applyLandslide5KmMask(centerLatLng) {
         const mLatLng = L.latLng(coords[1], coords[0]);
         const distMeters = normCenter.distanceTo(mLatLng);
 
-        if (distMeters <= 5000) {
+        if (distMeters <= 3000) {
             visibleCount++;
+            if (distMeters < closestDistMeters) {
+                closestDistMeters = distMeters;
+                closestFeature = feature;
+            }
 
-            // Create high-visibility detected landslide marker
-            const marker = L.circleMarker(mLatLng, {
-                color: '#ef4444',
-                fillColor: '#ea580c',
-                fillOpacity: 0.95,
-                radius: 7.5,
-                weight: 2.2,
-                opacity: 1,
-                className: 'detected-landslide-marker',
+            // Create target blip marker matching screenshot (hollow amber ring with white border and dark center)
+            const targetIcon = L.divIcon({
+                className: 'radar-ls-blip-container',
+                html: `<div class="radar-detected-ls-marker"><div class="radar-detected-ls-core"></div></div>`,
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+
+            const marker = L.marker(mLatLng, {
+                icon: targetIcon,
+                zIndexOffset: 1500,
                 pane: 'markerPane'
             });
 
@@ -187,15 +285,19 @@ function applyLandslide5KmMask(centerLatLng) {
                 const p = feature.properties || {};
                 const yr = p['Year'] || p['YYYY-MM-DD'] || 'N/A';
                 const loc = p['LANDSLID_2'] || 'N/A';
-                const nearAWS = findPriorityStationNearby(clickPt, 20);
+                const nearAWS = findPriorityStationNearby(clickPt, 25);
+                const nearAWSLevel = nearAWS ? (parseInt(nearAWS.RainfallLandslidethresholdwarninglevel) || 0) : 0;
+                const isNearAWSAvail = nearAWS ? (typeof isStationAvailable === 'function' ? isStationAvailable(nearAWS) : true) : false;
+                const isNearAWSDown = nearAWS ? (!isNearAWSAvail || String(nearAWS.RainfallLandslidethresholdwarninglevel).toLowerCase() === 'down') : false;
+                const nearAWSLevelStr = nearAWS ? (isNearAWSDown ? 'Offline / Down' : (nearAWSLevel > 0 ? `Level ${nearAWSLevel}` : 'No Warning/Available')) : 'N/A';
 
                 const conciseProps = {
                     "Incident Type": "Recorded Historical Landslide",
                     "Event Year": yr,
                     "Location (LANDSLID_2)": loc,
-                    "Nearest AWS Station": nearAWS ? `${nearAWS.StationName || nearAWS.Station} (${nearAWS.distance} km)` : "None nearby (>20km)",
-                    "Weather Warning Level": nearAWS ? `Level ${nearAWS.RainfallLandslidethresholdwarninglevel}` : "N/A",
-                    "Recommended Action": nearAWS ? (nearAWS.Recommendedactions || "Monitor") : "Monitor Local Advisories"
+                    "Nearest AWS Station": nearAWS ? `${nearAWS.StationName || nearAWS.Station} (${nearAWS.distance} km)` : "None nearby in area",
+                    "Weather Warning Level": nearAWSLevelStr,
+                    "Recommended Action": nearAWS ? (nearAWS.Recommendedactions || (nearAWSLevel > 0 ? "Prepare for possible evacuation" : "Continue routine monitoring")) : "Monitor Local Advisories"
                 };
                 updatePropertiesTable("Recorded Landslide Incident", conciseProps);
                 focusMapOnPopup(clickPt);
@@ -204,30 +306,225 @@ function applyLandslide5KmMask(centerLatLng) {
             if (radarNearbyLandslidesGroup) {
                 radarNearbyLandslidesGroup.addLayer(marker);
             }
-
-            // Add radar contact expanding ping wave animation (cap to nearest 10 for mobile WebKit performance)
-            if (visibleCount <= 10 && detectedLandslidePingsGroup) {
-                const delaySec = (((visibleCount - 1) % 5) * 0.35).toFixed(2);
-                const pingMarker = L.marker(mLatLng, {
-                    icon: L.divIcon({
-                        className: 'detected-ls-ping-icon',
-                        html: `<div class="detected-ls-ping-wave" style="animation-delay: ${delaySec}s;"></div>`,
-                        iconSize: [32, 32],
-                        iconAnchor: [16, 16]
-                    }),
-                    interactive: false,
-                    pane: 'markerPane'
-                });
-                detectedLandslidePingsGroup.addLayer(pingMarker);
-            }
         }
     });
 
-    console.log(`[5km Mask] Applied: ${visibleCount} landslides within 5km radius.`);
+    // Compute coordinate offsets for 1km, 2km, 3km circles, crosshairs, and labels
+    const cosLat = Math.cos(normCenter.lat * Math.PI / 180);
+    const latOffset1km = 1000 / 111139;
+    const latOffset2km = 2000 / 111139;
+    const latOffset3km = 3000 / 111139;
+    const lngOffset3km = 3000 / (111139 * (cosLat || 1));
+
+    if (radarTacticalGroup) {
+        // 1 KM Guide Circle (dashed amber)
+        const circle1km = L.circle(normCenter, {
+            radius: 1000,
+            color: '#eab308',
+            weight: 1.2,
+            dashArray: '4, 4',
+            fill: false,
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(circle1km);
+
+        // 2 KM Guide Circle (dashed amber)
+        const circle2km = L.circle(normCenter, {
+            radius: 2000,
+            color: '#eab308',
+            weight: 1.2,
+            dashArray: '4, 4',
+            fill: false,
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(circle2km);
+
+        // 3 KM Inner Accent Circle (subtle thin dashed)
+        const circle3kmInner = L.circle(normCenter, {
+            radius: 2930,
+            color: 'rgba(234, 179, 8, 0.4)',
+            weight: 1,
+            dashArray: '3, 4',
+            fill: false,
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(circle3kmInner);
+
+        // 3 KM Main Guide Circle (prominent dashed amber)
+        user3KmBufferCircle = L.circle(normCenter, {
+            radius: 3000,
+            color: '#eab308',
+            weight: 2.2,
+            dashArray: '8, 6',
+            fillColor: '#eab308',
+            fillOpacity: 0.04,
+            interactive: true,
+            className: 'user-3km-buffer-zone'
+        });
+        radarTacticalGroup.addLayer(user3KmBufferCircle);
+        user5KmBufferCircle = user3KmBufferCircle; // Reference alias
+
+        // North-South Crosshair Line
+        const crosshairNS = L.polyline([
+            [normCenter.lat - latOffset3km, normCenter.lng],
+            [normCenter.lat + latOffset3km, normCenter.lng]
+        ], {
+            color: 'rgba(234, 179, 8, 0.45)',
+            weight: 1.2,
+            dashArray: '3, 4',
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(crosshairNS);
+
+        // East-West Crosshair Line
+        const crosshairEW = L.polyline([
+            [normCenter.lat, normCenter.lng - lngOffset3km],
+            [normCenter.lat, normCenter.lng + lngOffset3km]
+        ], {
+            color: 'rgba(234, 179, 8, 0.45)',
+            weight: 1.2,
+            dashArray: '3, 4',
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(crosshairEW);
+
+        // Radius Text Labels: 1 KM, 2 KM, 3 KM at South axis
+        const label1km = L.marker([normCenter.lat - latOffset1km, normCenter.lng], {
+            icon: L.divIcon({
+                className: 'radar-guide-label',
+                html: '<span class="radar-radius-tag">1 KM</span>',
+                iconSize: [40, 16],
+                iconAnchor: [20, 8]
+            }),
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(label1km);
+
+        const label2km = L.marker([normCenter.lat - latOffset2km, normCenter.lng], {
+            icon: L.divIcon({
+                className: 'radar-guide-label',
+                html: '<span class="radar-radius-tag">2 KM</span>',
+                iconSize: [40, 16],
+                iconAnchor: [20, 8]
+            }),
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(label2km);
+
+        const label3km = L.marker([normCenter.lat - latOffset3km, normCenter.lng], {
+            icon: L.divIcon({
+                className: 'radar-guide-label',
+                html: '<span class="radar-radius-tag">3 KM</span>',
+                iconSize: [40, 16],
+                iconAnchor: [20, 8]
+            }),
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(label3km);
+
+        // North 'N' Indicator at North axis
+        const labelNorth = L.marker([normCenter.lat + (latOffset3km * 0.94), normCenter.lng], {
+            icon: L.divIcon({
+                className: 'radar-guide-label',
+                html: '<span class="radar-north-tag">N</span>',
+                iconSize: [24, 20],
+                iconAnchor: [12, 10]
+            }),
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(labelNorth);
+
+        // Callout Tag & Connector Line (Pointing to 3.0 km perimeter)
+        const calloutStartLng = normCenter.lng + (lngOffset3km * 0.38);
+        const calloutEndLng = normCenter.lng + lngOffset3km;
+
+        const calloutLine = L.polyline([
+            [normCenter.lat, calloutStartLng],
+            [normCenter.lat, calloutEndLng]
+        ], {
+            color: 'rgba(255, 255, 255, 0.85)',
+            weight: 1.8,
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(calloutLine);
+
+        const calloutTag = L.marker([normCenter.lat, calloutStartLng], {
+            icon: L.divIcon({
+                className: 'radar-callout-marker',
+                html: `<div class="radar-callout-tag">3.0 km Proximity Buffer: ${visibleCount} Landslides</div>`,
+                iconSize: [240, 26],
+                iconAnchor: [240, 13]
+            }),
+            interactive: false
+        });
+        radarTacticalGroup.addLayer(calloutTag);
+    }
+
+    // Create or update the rotating radar sweep, outer box, pulse, and center dot marker
+    if (userLocationMarker && map) {
+        map.removeLayer(userLocationMarker);
+        userLocationMarker = null;
+    }
+
+    const userTacticalIcon = L.divIcon({
+        className: 'tactical-radar-center-container',
+        html: `
+            <div id="tacticalRadarSweepEl" class="tactical-radar-sweep-cone"></div>
+            <div id="tacticalRadarOuterBox" class="tactical-radar-outer-box"></div>
+            <div class="tactical-center-pulse"></div>
+            <div class="tactical-center-dot" id="tacticalCenterDot">
+                <div class="tactical-center-inner"></div>
+            </div>
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+    });
+
+    userLocationMarker = L.marker(normCenter, {
+        icon: userTacticalIcon,
+        zIndexOffset: 2500,
+        title: "Your Location (Proximity Radar Center)"
+    }).addTo(map);
+
+    // If report content exists, rebind popup
+    if (currentRadarUserReportContent) {
+        userLocationMarker.bindPopup(currentRadarUserReportContent, {
+            autoPan: false,
+            maxWidth: 360,
+            className: 'user-location-popup'
+        });
+    }
+
+    userLocationMarker.on('click', () => {
+        focusMapOnPopup(normCenter);
+        userLocationMarker.openPopup();
+    });
+
+    if (user3KmBufferCircle) {
+        user3KmBufferCircle.on('click', () => {
+            focusMapOnPopup(normCenter);
+            if (userLocationMarker) userLocationMarker.openPopup();
+        });
+    }
+
+    // Update sweep and box dimensions on zoom
+    updateTacticalRadarSweepSize();
+    map.off('zoomend viewreset', updateTacticalRadarSweepSize);
+    map.on('zoomend viewreset', updateTacticalRadarSweepSize);
+
+    // Update the Tactical HUD
+    updateTacticalHud(visibleCount, closestDistMeters, closestFeature);
     updateMaskButtonUI(true);
+
+    console.log(`[Tactical 3km Radar] Applied: ${visibleCount} landslides within 3km radius.`);
 }
 
-function clearLandslide5KmMask() {
+// Backward compatibility alias
+const applyLandslide5KmMask = applyLandslide3KmMask;
+window.applyLandslide3KmMask = applyLandslide3KmMask;
+window.applyLandslide5KmMask = applyLandslide3KmMask;
+
+function clearLandslide3KmMask() {
     isLandslide5KmMaskActive = false;
     if (radarNearbyLandslidesGroup) {
         radarNearbyLandslidesGroup.clearLayers();
@@ -235,21 +532,20 @@ function clearLandslide5KmMask() {
             map.removeLayer(radarNearbyLandslidesGroup);
         }
     }
-    if (detectedLandslidePingsGroup) {
-        detectedLandslidePingsGroup.clearLayers();
-        if (map && map.hasLayer(detectedLandslidePingsGroup)) {
-            map.removeLayer(detectedLandslidePingsGroup);
-        }
-    }
 
-    // Restore full regional landslide layer if user requests to see all regional landslides
+    // Restore full regional landslide layer if requested
     const lsLayer = getLandslidesLayer();
     if (lsLayer && map && !map.hasLayer(lsLayer)) {
         map.addLayer(lsLayer);
     }
 
     updateMaskButtonUI(false);
+    const maskBtn = document.getElementById('hud3kmOnlyBtn');
+    if (maskBtn) maskBtn.innerText = '3km Only: OFF';
 }
+const clearLandslide5KmMask = clearLandslide3KmMask;
+window.clearLandslide3KmMask = clearLandslide3KmMask;
+window.clearLandslide5KmMask = clearLandslide5KmMask;
 
 function refreshLandslideMaskDisplay() {
     if (!isLandslide5KmMaskActive || !userAssessmentLatLng) return;
@@ -260,54 +556,89 @@ function refreshLandslideMaskDisplay() {
     if (radarNearbyLandslidesGroup && map && !map.hasLayer(radarNearbyLandslidesGroup)) {
         map.addLayer(radarNearbyLandslidesGroup);
     }
-    if (detectedLandslidePingsGroup && map && !map.hasLayer(detectedLandslidePingsGroup)) {
-        map.addLayer(detectedLandslidePingsGroup);
+    if (radarTacticalGroup && map && !map.hasLayer(radarTacticalGroup)) {
+        map.addLayer(radarTacticalGroup);
     }
+    updateTacticalRadarSweepSize();
 }
 
 function toggleLandslideMask() {
     if (isLandslide5KmMaskActive) {
-        clearLandslide5KmMask();
-        showError("5km filter disabled: Showing all recorded landslides across the region.", "info");
+        clearLandslide3KmMask();
+        showError("3km filter disabled: Showing all recorded landslides across the region.", "info");
     } else {
         if (userAssessmentLatLng) {
-            applyLandslide5KmMask(userAssessmentLatLng);
-            showError("5km filter activated: Showing only landslides within 5km buffer.", "info");
+            applyLandslide3KmMask(userAssessmentLatLng);
+            showError("3km filter activated: Showing only landslides within 3km buffer.", "info");
         } else {
-            showError("No active user assessment location found to apply 5km filter.", "warning");
+            showError("No active user assessment location found to apply 3km filter.", "warning");
         }
+    }
+    const maskBtn = document.getElementById('hud3kmOnlyBtn');
+    if (maskBtn) {
+        maskBtn.innerText = `3km Only: ${isLandslide5KmMaskActive ? 'ON' : 'OFF'}`;
     }
 }
 
 function updateMaskButtonUI(isActive) {
     const popupBtn = document.getElementById('toggleLs5kmMaskBtn');
     if (popupBtn) {
-        popupBtn.innerHTML = isActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 5km';
+        popupBtn.innerHTML = isActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 3km';
         popupBtn.classList.toggle('active', isActive);
     }
     document.querySelectorAll('.toggle-ls-mask-btn').forEach(btn => {
-        btn.innerHTML = isActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 5km';
+        btn.innerHTML = isActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 3km';
         btn.classList.toggle('active', isActive);
     });
     const badge = document.getElementById('bufferMaskBadge');
     if (badge) {
         badge.className = `buffer-status-badge ${isActive ? 'badge-active' : 'badge-inactive'}`;
-        badge.innerHTML = isActive ? '🛡️ Filtered (5km Radius Only)' : '🌐 Inactive (All Regional Shown)';
+        badge.innerHTML = isActive ? '🛡️ Filtered (3km Radius Only)' : '🌐 Inactive (All Regional Shown)';
     }
 }
 
-function fitTo5KmBuffer() {
-    if (user5KmBufferCircle && map) {
-        map.fitBounds(user5KmBufferCircle.getBounds(), {
-            padding: [60, 60],
-            maxZoom: 14,
+function fitTo3KmBuffer() {
+    if (user3KmBufferCircle && map) {
+        map.fitBounds(user3KmBufferCircle.getBounds(), {
+            padding: [70, 70],
+            maxZoom: 15,
             animate: true,
             duration: 0.8
         });
     } else if (userAssessmentLatLng && map) {
-        map.setView(userAssessmentLatLng, 13);
+        map.setView(userAssessmentLatLng, 14);
     }
 }
+const fitTo5KmBuffer = fitTo3KmBuffer;
+window.fitTo3KmBuffer = fitTo3KmBuffer;
+window.fitTo5KmBuffer = fitTo3KmBuffer;
+
+function focusDetectedAwsStation() {
+    if (userAssessmentLatLng && map && typeof cachedAWSData !== 'undefined') {
+        const priorityStation = typeof findPriorityStationNearby === 'function' ? findPriorityStationNearby(userAssessmentLatLng, 25) : null;
+        if (priorityStation) {
+            const lat = parseFloat(priorityStation.Latitude);
+            const lng = parseFloat(priorityStation.Longitude);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const group = L.featureGroup([
+                    L.marker(userAssessmentLatLng),
+                    L.marker([lat, lng])
+                ]);
+                map.fitBounds(group.getBounds(), {
+                    padding: [70, 70],
+                    maxZoom: 15,
+                    animate: true,
+                    duration: 0.8
+                });
+                return;
+            }
+        }
+    }
+    if (user3KmBufferCircle) {
+        fitTo3KmBuffer();
+    }
+}
+window.focusDetectedAwsStation = focusDetectedAwsStation;
 
 function clearUserLocationAssessment() {
     userAssessmentActive = false;
@@ -321,6 +652,10 @@ function clearUserLocationAssessment() {
         map.removeLayer(userAccuracyCircle);
         userAccuracyCircle = null;
     }
+    if (user3KmBufferCircle && map) {
+        map.removeLayer(user3KmBufferCircle);
+        user3KmBufferCircle = null;
+    }
     if (user5KmBufferCircle && map) {
         map.removeLayer(user5KmBufferCircle);
         user5KmBufferCircle = null;
@@ -329,8 +664,21 @@ function clearUserLocationAssessment() {
         map.removeLayer(userRadarRangeRing);
         userRadarRangeRing = null;
     }
+    if (radarTacticalGroup && map) {
+        radarTacticalGroup.clearLayers();
+        if (map.hasLayer(radarTacticalGroup)) {
+            map.removeLayer(radarTacticalGroup);
+        }
+    }
 
-    clearLandslide5KmMask();
+    if (map) {
+        map.off('zoomend viewreset', updateTacticalRadarSweepSize);
+    }
+
+    const hud = document.getElementById('radarTacticalHud');
+    if (hud) hud.style.display = 'none';
+
+    clearLandslide3KmMask();
     if (typeof hideLandslidePointsLSDB === 'function') {
         hideLandslidePointsLSDB();
     }
@@ -505,7 +853,7 @@ function gpsProximityLandslideRadar() {
     isGpsLocating = true;
 
     // Show non-blocking status notification that doesn't freeze the WebKit compositor
-    showError("📡 Acquiring GPS Signal for GPS PROXIMITY LANDSLIDE RADAR (5km)...", "info");
+    showError("📡 Acquiring GPS Signal for GPS PROXIMITY LANDSLIDE RADAR (3km)...", "info");
 
     try {
         map.locate({ 
@@ -670,6 +1018,9 @@ function formatPropertyValue(key, value) {
     if (value === null || value === undefined) return 'N/A';
     const k = String(key).toLowerCase().trim();
     const v = String(value).toLowerCase().trim();
+    if ((k.includes('warning') || k.includes('threshold')) && (v === '0' || v === 'level 0' || v === '0.0')) {
+        return 'No Warning/Available';
+    }
     if (k === 'rating' || k.includes('suscept')) {
         if (v === 'high' || v.includes('high')) return 'High Susceptibility';
         if (v === 'moderate' || v === 'med' || v.includes('mod')) return 'Moderate Susceptibility';
@@ -813,7 +1164,7 @@ try {
                                 ${nearestSt ? `
                                     <tr><th>Station</th><td><strong>${nearestSt.StationName || nearestSt.Station}</strong></td></tr>
                                     <tr><th>Distance</th><td>${nearestSt.distance} km</td></tr>
-                                    <tr><th>Warning Level</th><td><span class="warning-badge badge-level-${nearestSt.RainfallLandslidethresholdwarninglevel || 0}">Level ${nearestSt.RainfallLandslidethresholdwarninglevel || 0}</span></td></tr>
+                                    <tr><th>Warning Level</th><td><span class="warning-badge badge-level-${parseInt(nearestSt.RainfallLandslidethresholdwarninglevel) || 0}">${(parseInt(nearestSt.RainfallLandslidethresholdwarninglevel) || 0) > 0 ? 'Level ' + (parseInt(nearestSt.RainfallLandslidethresholdwarninglevel) || 0) : 'No Warning/Available'}</span></td></tr>
                                     <tr><th>Rainfall</th><td><b>${nearestSt.Rainfall || nearestSt.R24H || '0'}</b> mm</td></tr>
                                 ` : `<tr><td colspan="2" style="text-align:center; color:#888;">No active AWS within 35km</td></tr>`}
                             </table>
@@ -937,33 +1288,21 @@ try {
             const latlng = e.latlng;
             const accuracyMeters = Math.round(e.accuracy || 0);
 
-            // Remove previous GPS marker, accuracy circle, and buffer circles if any
-            if (userLocationMarker) {
-                map.removeLayer(userLocationMarker);
-                userLocationMarker = null;
-            }
+            // Remove previous GPS accuracy circle if any
             if (userAccuracyCircle) {
                 map.removeLayer(userAccuracyCircle);
                 userAccuracyCircle = null;
             }
-            if (user5KmBufferCircle) {
-                map.removeLayer(user5KmBufferCircle);
-                user5KmBufferCircle = null;
-            }
-            if (userRadarRangeRing) {
-                map.removeLayer(userRadarRangeRing);
-                userRadarRangeRing = null;
-            }
 
-            // Draw accuracy circle with high-visibility cyan radar perimeter (GPU-safe)
+            // Draw accuracy circle with high-visibility amber radar perimeter (GPU-safe)
             userAccuracyCircle = L.circle(latlng, {
                 radius: Math.max(accuracyMeters, 5),
-                color: 'rgba(0, 255, 255, 0.75)',
-                fillColor: '#00ffff',
+                color: 'rgba(234, 179, 8, 0.75)',
+                fillColor: '#eab308',
                 fillOpacity: 0.05,
                 weight: 1.5,
                 dashArray: '5, 5',
-                className: 'cyan-accuracy-circle',
+                className: 'amber-accuracy-circle',
                 pane: 'overlayPane'
             }).addTo(map);
 
@@ -973,70 +1312,16 @@ try {
                 className: 'cyan-accuracy-tooltip'
             });
 
-            // Modern, lightweight Cyan Radar Beacon (Hardware-Accelerated & WebKit-Safe)
-            const userIcon = L.divIcon({
-                className: 'user-location-marker-container cyan-radar-mode',
-                html: `
-                    <div class="user-location-radar-sweep"></div>
-                    <div class="user-location-pulse-ring ring-1"></div>
-                    <div class="user-location-pulse-ring ring-2"></div>
-                    <div class="user-location-dot">
-                        <div class="user-location-dot-core"></div>
-                    </div>
-                `,
-                iconSize: [60, 60],
-                iconAnchor: [30, 30],
-                popupAnchor: [0, -26]
-            });
+            // Find nearby priority AWS and 3km landslide count
+            const priorityStation = findPriorityStationNearby(latlng, 25); 
+            const lsCount = getNearbyLandslideCount(latlng, 3); 
+            const pLevel = priorityStation ? (parseInt(priorityStation.RainfallLandslidethresholdwarninglevel) || 0) : 0;
+            const isAvail = priorityStation ? (typeof isStationAvailable === 'function' ? isStationAvailable(priorityStation) : true) : false;
+            const isDown = priorityStation ? (!isAvail || String(priorityStation.RainfallLandslidethresholdwarninglevel).toLowerCase() === 'down') : false;
+            const pLevelStr = priorityStation ? (isDown ? 'Offline / Down' : (pLevel > 0 ? `Level ${pLevel}` : 'No Warning/Available')) : 'N/A';
 
-            userLocationMarker = L.marker(latlng, {
-                icon: userIcon,
-                zIndexOffset: 2000,
-                title: `Your Location (±${accuracyMeters}m)`
-            }).addTo(map);
-
-            const priorityStation = findPriorityStationNearby(latlng, 20); 
-            const lsCount = getNearbyLandslideCount(latlng, 5); 
-
-            // Draw 5km Assessment Zone Cyan Radar Buffer Circle
-            user5KmBufferCircle = L.circle(latlng, {
-                radius: 5000,
-                color: '#00e5ff',
-                fillColor: '#00e5ff',
-                fillOpacity: 0.035,
-                weight: 1.6,
-                dashArray: '6, 6',
-                className: 'user-5km-buffer-zone',
-                interactive: true
-            }).addTo(map);
-
-            user5KmBufferCircle.bindTooltip(`📡 GPS PROXIMITY LANDSLIDE RADAR (5km Buffer): ${lsCount} detected`, {
-                direction: 'top',
-                offset: [0, -10],
-                className: 'buffer-5km-tooltip'
-            });
-
-            // Concentric 2.5km inner range ring for tactical radar display
-            userRadarRangeRing = L.circle(latlng, {
-                radius: 2500,
-                color: 'rgba(0, 229, 255, 0.3)',
-                fillColor: 'transparent',
-                fillOpacity: 0,
-                weight: 1,
-                dashArray: '4, 4',
-                className: 'user-radar-range-ring',
-                interactive: false
-            }).addTo(map);
-
-            user5KmBufferCircle.on('click', () => {
-                if (userLocationMarker) {
-                    focusMapOnPopup(latlng);
-                    userLocationMarker.openPopup();
-                }
-            });
-
-            // Mask out distant landslides and populate nearby radar landslides
-            applyLandslide5KmMask(latlng);
+            // Apply 3km Tactical Radar (creates 1, 2, 3km guide rings, crosshairs, labels, callout, rotating sweep cone, and HUD)
+            applyLandslide3KmMask(latlng);
 
             // Accuracy classification badge
             let accuracyBadge = '';
@@ -1048,7 +1333,7 @@ try {
                 accuracyBadge = `<span class="accuracy-pill accuracy-low">🔴 Approx (±${accuracyMeters} m)</span>`;
             }
 
-            const userProperties = {
+            const userLocationDetails = {
                 "Location Type": "📍 GPS Detected Location",
                 "Latitude": `${latlng.lat.toFixed(6)}°`,
                 "Longitude": `${latlng.lng.toFixed(6)}°`,
@@ -1056,25 +1341,45 @@ try {
                 "Signal Precision": accuracyBadge
             };
 
-            const reportContent = generateCombinedReport("GPS PROXIMITY LANDSLIDE RADAR", userProperties, priorityStation, lsCount);
+            const userPropertiesForTable = { ...userLocationDetails };
+
+            if (priorityStation) {
+                userPropertiesForTable["Nearby AWS Station"] = `📡 ${priorityStation.StationName || priorityStation.Station} (${priorityStation.distance} km)`;
+                userPropertiesForTable["Weather Warning Level"] = pLevelStr;
+                userPropertiesForTable["Rainfall (7-days)"] = `${priorityStation.R24H || priorityStation.Rainfall || '0'} mm`;
+                userPropertiesForTable["Recommended Action"] = priorityStation.Recommendedactions || (pLevel > 0 ? 'Prepare for possible evacuation' : 'Continue routine monitoring');
+            } else {
+                userPropertiesForTable["Nearby AWS Station"] = "No available AWS in area";
+                userPropertiesForTable["Weather Warning Level"] = "No Warning/Available";
+            }
+
+            const reportContent = generateCombinedReport("GPS PROXIMITY LANDSLIDE RADAR", userLocationDetails, priorityStation, lsCount);
+            currentRadarUserReportContent = reportContent;
 
             if (typeof isWatchingAlerts !== 'undefined' && isWatchingAlerts) {
                 checkAndTriggerMobileNotification(priorityStation);
             }
 
             // CRITICAL FOR SAFARI / ALL BROWSERS: autoPan: false prevents animation collision with flyTo
-            userLocationMarker.bindPopup(reportContent, {
-                autoPan: false,
-                maxWidth: 360,
-                className: 'user-location-popup'
-            });
+            if (userLocationMarker) {
+                userLocationMarker.bindPopup(reportContent, {
+                    autoPan: false,
+                    maxWidth: 360,
+                    className: 'user-location-popup'
+                });
+            }
+
+            if (user3KmBufferCircle) {
+                const awsTooltipSuffix = priorityStation ? ` | AWS: ${priorityStation.StationName || priorityStation.Station} (${pLevelStr})` : '';
+                user3KmBufferCircle.bindTooltip(`📡 GPS PROXIMITY LANDSLIDE RADAR (3km Buffer): ${lsCount} detected${awsTooltipSuffix}`, {
+                    direction: 'top',
+                    offset: [0, -10],
+                    className: 'buffer-5km-tooltip'
+                });
+            }
 
             // Determine optimal zoom level based on accuracy
-            const targetZoom = accuracyMeters < 100 ? 16 : (accuracyMeters < 500 ? 15 : 14);
-
-            userLocationMarker.on('click', () => {
-                focusMapOnPopup(latlng, targetZoom);
-            });
+            const targetZoom = 14;
 
             // Smoothly fly and focus map directly on user location
             focusMapOnPopup(latlng, targetZoom);
@@ -1094,13 +1399,21 @@ try {
             });
             setTimeout(openPopupSafely, 1500); // Reliable fallback if moveend finished early
 
-            updatePropertiesTable("GPS PROXIMITY LANDSLIDE RADAR", userProperties);
-            showError(`📍 GPS Signal Locked: ${lsCount} landslide(s) within 5km radius`, "info");
+            updatePropertiesTable("GPS PROXIMITY LANDSLIDE RADAR", userPropertiesForTable);
+            const awsNotice = priorityStation ? ` | AWS: ${priorityStation.StationName || priorityStation.Station} (${pLevelStr})` : '';
+            showError(`📍 GPS Signal Locked: ${lsCount} landslide(s) within 3km radius${awsNotice}`, "info");
         } catch (err) {
             console.error("Error processing locationfound:", err);
             showError("GPS location acquired, but an error occurred updating map layers.", "warning");
         }
     });
+
+    // Development & Verification helper to test tactical radar at any coordinates
+    window.testTacticalRadar = function(lat = 14.165, lng = 121.24) {
+        if (!map) return;
+        const testPt = L.latLng(lat, lng);
+        map.fire('locationfound', { latlng: testPt, accuracy: 25 });
+    };
     
     map.on('locationerror', function(e) { 
         isGpsLocating = false;
@@ -1143,7 +1456,7 @@ try {
             const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control gps-image-btn');
             const img = L.DomUtil.create('img', '', container);
             img.src = 'https://raw.githubusercontent.com/LIGTAS-AGAD/ligtas-agad-rilews-v-15-mobile-edition/refs/heads/main/ISLAW2.png'; 
-            img.title = "GPS PROXIMITY LANDSLIDE RADAR (5km Radius)";
+            img.title = "GPS PROXIMITY LANDSLIDE RADAR (3km Radius)";
             const closeBtn = L.DomUtil.create('div', 'gps-close-btn', container);
             closeBtn.innerHTML = '×'; closeBtn.title = "Hide GPS Button";
 
@@ -1196,34 +1509,120 @@ const layerLogos = [
     'https://raw.githubusercontent.com/Gabzrock/LIGTASAGADEWSV3/refs/heads/main/layer_layers_icon_193964.png'
 ];
 
-function findPriorityStationNearby(latlng, maxRadiusKm = 20) {
-    if (!cachedAWSData || cachedAWSData.length === 0) return null;
-    let priorityStation = null;
-    let highestWarningLevel = -1;
-    let minDistanceForHighest = Infinity;
+function isStationAvailable(station) {
+    if (!station) return false;
+    const status = String(station.Status || '').trim().toUpperCase();
+    if (status.includes('NON-OPERATIONAL') || status.includes('OFFLINE') || status.includes('INACTIVE') || status.includes('DISABLED')) {
+        return false;
+    }
+    const rawLevel = String(station.RainfallLandslidethresholdwarninglevel || '').trim().toLowerCase();
+    if (rawLevel === 'down' || rawLevel === 'n/a' || rawLevel === '#value!' || rawLevel === 'offline' || rawLevel === 'disabled' || rawLevel === 'null' || rawLevel === 'none') {
+        return false;
+    }
+    return true;
+}
+
+function getStationWarningLevel(station) {
+    if (!station || !isStationAvailable(station)) return 0;
+    const rawLevel = String(station.RainfallLandslidethresholdwarninglevel || '').trim().toLowerCase();
+    const lvl = parseInt(rawLevel);
+    return (!isNaN(lvl) && lvl >= 0) ? lvl : 0;
+}
+
+function findPriorityStationNearby(latlng, maxRadiusKm = 25) {
+    if (!cachedAWSData || cachedAWSData.length === 0 || !latlng) return null;
 
     try {
+        const normLatLng = L.latLng(latlng);
+        const availableStations = [];
+        const fallbackStations = [];
+
         cachedAWSData.forEach(station => {
             const lat = parseFloat(station.Latitude);
             const lng = parseFloat(station.Longitude);
-            if(isNaN(lat) || isNaN(lng)) return;
+            if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
 
             const slatlng = L.latLng(lat, lng);
-            const distKm = latlng.distanceTo(slatlng) / 1000;
+            const distKm = normLatLng.distanceTo(slatlng) / 1000;
+            const available = isStationAvailable(station);
+            const warningLevel = available ? getStationWarningLevel(station) : -1;
 
-            if (distKm <= maxRadiusKm) {
-                const rawLevel = String(station.RainfallLandslidethresholdwarninglevel).trim().toLowerCase();
-                let level = parseInt(rawLevel); if (isNaN(level)) level = 0;
+            const stationItem = {
+                ...station,
+                distance: distKm.toFixed(2),
+                distNum: distKm,
+                warningLevel: warningLevel,
+                isAvailable: available
+            };
 
-                if (level > highestWarningLevel || (level === highestWarningLevel && distKm < minDistanceForHighest)) {
-                    highestWarningLevel = level;
-                    minDistanceForHighest = distKm;
-                    priorityStation = { ...station, distance: distKm.toFixed(2) };
-                }
+            if (available) {
+                availableStations.push(stationItem);
+            } else {
+                fallbackStations.push(stationItem);
             }
         });
-    } catch(e) { console.error("Error finding nearest station:", e); }
-    return priorityStation;
+
+        if (availableStations.length === 0 && fallbackStations.length === 0) {
+            return null;
+        }
+
+        // 1. Highest Priority: Available stations with active warnings (Level >= 1) in the area (up to 35km)
+        // Detects the nearby available AWS in the area with Higher warning levels (Level 3 > Level 2 > Level 1)
+        const areaWarningStations = availableStations.filter(s => s.distNum <= 35 && s.warningLevel >= 1);
+        if (areaWarningStations.length > 0) {
+            areaWarningStations.sort((a, b) => {
+                if (b.warningLevel !== a.warningLevel) {
+                    return b.warningLevel - a.warningLevel;
+                }
+                return a.distNum - b.distNum;
+            });
+            return areaWarningStations[0];
+        }
+
+        // 2. Secondary Priority: Available stations within the primary radius (maxRadiusKm, default 25km)
+        const nearbyAvailable = availableStations.filter(s => s.distNum <= maxRadiusKm);
+        if (nearbyAvailable.length > 0) {
+            nearbyAvailable.sort((a, b) => {
+                if (b.warningLevel !== a.warningLevel) {
+                    return b.warningLevel - a.warningLevel;
+                }
+                return a.distNum - b.distNum;
+            });
+            return nearbyAvailable[0];
+        }
+
+        // 3. Extended Area: Available stations within 45km
+        const extendedAvailable = availableStations.filter(s => s.distNum <= 45);
+        if (extendedAvailable.length > 0) {
+            extendedAvailable.sort((a, b) => {
+                if (b.warningLevel !== a.warningLevel) {
+                    return b.warningLevel - a.warningLevel;
+                }
+                return a.distNum - b.distNum;
+            });
+            return extendedAvailable[0];
+        }
+
+        // 4. Regional Fallback: Any available station within 75km
+        const regionalAvailable = availableStations.filter(s => s.distNum <= 75);
+        if (regionalAvailable.length > 0) {
+            regionalAvailable.sort((a, b) => a.distNum - b.distNum);
+            return regionalAvailable[0];
+        }
+
+        // 5. Ultimate Fallback: If no available stations are online, return closest station within 30km
+        if (fallbackStations.length > 0) {
+            fallbackStations.sort((a, b) => a.distNum - b.distNum);
+            if (fallbackStations[0].distNum <= 30) {
+                return fallbackStations[0];
+            }
+        }
+
+        return null;
+    } catch (e) {
+        console.error("Error finding priority station nearby:", e);
+        return null;
+    }
 }
 
 function getNearbyLandslideCount(latlng, radiusKm = 5) {
@@ -1313,9 +1712,14 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
             <tr><th>Barangay</th><td>${brgyVal}</td></tr>
         `;
     } else {
+        const isGpsRadar = layerName === "User Location" || String(layerName).includes("GPS PROXIMITY");
         for (const [key, value] of Object.entries(safeProps)) {
             const kLower = String(key).toLowerCase().trim();
             if (['objectid', 'fid', 'shape_length', 'shape_area', 'id'].includes(kLower)) continue;
+            // Prevent duplicate AWS info in Section 1 for GPS proximity radar since Section 2 specifically presents Weather Status
+            if (isGpsRadar && (kLower.includes('aws') || kLower.includes('weather') || kLower.includes('station') || kLower.includes('warning') || kLower.includes('rainfall') || kLower.includes('recommend'))) {
+                continue;
+            }
             const displayKey = formatPropertyName(key); let displayValue = formatPropertyValue(key, value);
             if (typeof displayValue === 'string' && (displayValue.startsWith('http') || displayValue.startsWith('www'))) {
                  displayValue = `<a href="${displayValue}" target="_blank" style="color:var(--primary-color); text-decoration:none; font-weight:bold;">View Link 🔗</a>`;
@@ -1327,35 +1731,49 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
     let stationContent = `
         <tr>
             <td colspan="2" style="text-align:center; padding:14px; color:#e11d48; font-weight:700; background:rgba(244,63,94,0.06); border-radius:8px;">
-                ❌ No AWS nearby (Out of 20km Coverage Zone)
+                ❌ No available AWS detected in the area
             </td>
         </tr>`;
 
     if (nearestStation) {
         const rawWLevel = parseInt(nearestStation.RainfallLandslidethresholdwarninglevel) || 0;
-        const badgeClass = `badge-level-${rawWLevel}`;
+        const isAvail = typeof isStationAvailable === 'function' ? isStationAvailable(nearestStation) : true;
+        const isDown = !isAvail || String(nearestStation.RainfallLandslidethresholdwarninglevel).toLowerCase() === 'down';
+        let badgeClass = `badge-level-${rawWLevel}`;
+        let levelBadgeText = '';
+        if (isDown) {
+            badgeClass = 'badge-level-offline';
+            levelBadgeText = '⚪ Offline / Down';
+        } else if (rawWLevel > 0) {
+            levelBadgeText = `⚠️ Level ${rawWLevel}`;
+        } else {
+            badgeClass = 'badge-level-0';
+            levelBadgeText = '✅ No Warning/Available';
+        }
+
         stationContent = `
             <tr><th>Nearest Station</th><td><strong>${nearestStation.StationName || nearestStation.Station}</strong></td></tr>
             <tr><th>Distance</th><td>${nearestStation.distance} km</td></tr>
-            <tr><th>Warning Level</th><td><span class="warning-badge ${badgeClass}">${rawWLevel > 0 ? '⚠️ ' : '✅ '}Level ${rawWLevel}</span></td></tr>
+            <tr><th>Warning Level</th><td><span class="warning-badge ${badgeClass}">${levelBadgeText}</span></td></tr>
             <tr><th>Rainfall (7-days)</th><td><b>${nearestStation.R24H || nearestStation.Rainfall || '0'}</b> mm</td></tr>
             <tr><th>Latitude</th><td>${nearestStation.Latitude || 'N/A'}</td></tr>
             <tr><th>Longitude</th><td>${nearestStation.Longitude || 'N/A'}</td></tr>
             <tr><th>Elevation</th><td>${nearestStation.Elevation ? nearestStation.Elevation + ' m' : 'N/A'}</td></tr>
-            <tr><th>Rec. Actions</th><td><span style="color:var(--dark-teal); font-weight:600;">${nearestStation.Recommendedactions || 'Monitor'}</span></td></tr>
+            <tr><th>Rec. Actions</th><td><span style="color:var(--dark-teal); font-weight:600;">${nearestStation.Recommendedactions || (rawWLevel > 0 ? 'Prepare for possible evacuation' : 'Continue routine monitoring')}</span></td></tr>
         `;
     }
 
+    const isRadar = layerName === "User Location" || layerName.includes("GPS PROXIMITY") || userAssessmentActive;
     let lsContent = `
-        <tr><th>Nearby Landslides (5km)</th><td><b style="color:var(--primary-color); font-size:1.05em;">${landslideCount}</b> recorded event(s)</td></tr>
+        <tr><th>Nearby Landslides (3km)</th><td><b style="color:var(--primary-color); font-size:1.05em;">${landslideCount}</b> recorded event(s)</td></tr>
     `;
-    if (layerName === "User Location" || layerName.includes("GPS PROXIMITY") || userAssessmentActive) {
+    if (isRadar) {
         lsContent += `
             <tr>
-                <th>5km Buffer Mask</th>
+                <th>3km Buffer Mask</th>
                 <td>
                     <span id="bufferMaskBadge" class="buffer-status-badge ${isLandslide5KmMaskActive ? 'badge-active' : 'badge-inactive'}">
-                        ${isLandslide5KmMaskActive ? '🛡️ Filtered (5km Radius Only)' : '🌐 Inactive (All Regional Shown)'}
+                        ${isLandslide5KmMaskActive ? '🛡️ Filtered (3km Radius Only)' : '🌐 Inactive (All Regional Shown)'}
                     </span>
                 </td>
             </tr>
@@ -1367,11 +1785,15 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
         userLocationActions = `
             <div class="user-assessment-controls" style="margin: 8px 0 4px 0; display: flex; flex-direction: column; gap: 4px;">
                 <button class="filter-ls-btn toggle-ls-mask-btn" id="toggleLs5kmMaskBtn" onclick="toggleLandslideMask()">
-                    ${isLandslide5KmMaskActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 5km'}
+                    ${isLandslide5KmMaskActive ? '🌐 Show All Regional Landslides' : '🎯 Mask Landslides > 3km'}
                 </button>
-                <button class="filter-ls-btn outline" onclick="fitTo5KmBuffer()">
-                    🔍 Fit Map to 5km Buffer Zone
+                <button class="filter-ls-btn outline" onclick="fitTo3KmBuffer()">
+                    🔍 Fit Map to 3km Buffer Zone
                 </button>
+                ${nearestStation ? `
+                <button class="filter-ls-btn outline" onclick="focusDetectedAwsStation()" style="border-color:#00e5ff; color:var(--dark-teal);">
+                    📡 View Detected AWS (${nearestStation.distance} km)
+                </button>` : ''}
             </div>
         `;
     }
@@ -1382,7 +1804,8 @@ function generateCombinedReport(layerName, properties, nearestStation, landslide
     const popupHeaderTitle = (layerName === "User Location" || layerName.includes("GPS PROXIMITY")) ? 
         "GPS PROXIMITY LANDSLIDE RADAR" : "Generated Report";
 
-    const section1Title = isSyncLayer ? "1 LOCATION DETAILS (Barangay)" : `1. Location Details (${layerName})`;
+    const section1Title = isSyncLayer ? "1 LOCATION DETAILS (Barangay)" : 
+        ((layerName === "User Location" || layerName.includes("GPS PROXIMITY")) ? "1. Location Details" : `1. Location Details (${layerName})`);
 
     return `
         <div class="popup-container">
@@ -1532,12 +1955,12 @@ function generateLandslidePointReport(feature, latlng) {
     const year = props['Year'] || props['YYYY-MM-DD'] || props['Month'] || 'Historical Event';
     const location = props['LANDSLID_2'] || props['BARANGAY'] || props['MUNICIPALI'] || 'Recorded Landslide Location';
 
-    // 1. Nearby AWS Weather Data & Recommended Actions (20km radius)
-    const priorityStation = findPriorityStationNearby(normLatLng, 20);
+    // 1. Nearby AWS Weather Data & Recommended Actions (in the area)
+    const priorityStation = findPriorityStationNearby(normLatLng, 25);
     let stationContent = `
         <tr>
             <td colspan="2" style="text-align:center; padding:12px; color:#e11d48; font-weight:700; background:rgba(244,63,94,0.06); border-radius:8px;">
-                ❌ No AWS nearby (Out of 20km Coverage Zone)
+                ❌ No available AWS detected in the area
             </td>
         </tr>
     `;
@@ -1547,11 +1970,24 @@ function generateLandslidePointReport(feature, latlng) {
 
     if (priorityStation) {
         const rawWLevel = parseInt(priorityStation.RainfallLandslidethresholdwarninglevel) || 0;
-        const badgeClass = `badge-level-${rawWLevel}`;
+        const isAvail = typeof isStationAvailable === 'function' ? isStationAvailable(priorityStation) : true;
+        const isDown = !isAvail || String(priorityStation.RainfallLandslidethresholdwarninglevel).toLowerCase() === 'down';
+        let badgeClass = `badge-level-${rawWLevel}`;
+        let levelBadgeText = '';
+        if (isDown) {
+            badgeClass = 'badge-level-offline';
+            levelBadgeText = '⚪ Offline / Down';
+        } else if (rawWLevel > 0) {
+            levelBadgeText = `⚠️ Level ${rawWLevel}`;
+        } else {
+            badgeClass = 'badge-level-0';
+            levelBadgeText = '✅ No Warning/Available';
+        }
+
         stationContent = `
             <tr><th>Nearest Station</th><td><strong>${priorityStation.StationName || priorityStation.Station}</strong></td></tr>
             <tr><th>Station Distance</th><td><b>${priorityStation.distance} km</b></td></tr>
-            <tr><th>Threshold Warning</th><td><span class="warning-badge ${badgeClass}">${rawWLevel > 0 ? '⚠️ ' : '✅ '}Level ${rawWLevel}</span></td></tr>
+            <tr><th>Threshold Warning</th><td><span class="warning-badge ${badgeClass}">${levelBadgeText}</span></td></tr>
             <tr><th>Rainfall (7-days)</th><td><b>${priorityStation.R24H || priorityStation.Rainfall || '0'}</b> mm</td></tr>
         `;
         const actionText = priorityStation.Recommendedactions || (rawWLevel > 0 ? 'Prepare for possible evacuation' : 'Continue routine monitoring');
@@ -1666,15 +2102,19 @@ function createGeoJSONLayer(name, description, geojsonUrl, styleOptions = {}, ic
                                 const p = feature.properties || {};
                                 const yr = p['Year'] || p['YYYY-MM-DD'] || 'N/A';
                                 const loc = p['LANDSLID_2'] || 'N/A';
-                                const nearAWS = findPriorityStationNearby(clickPt, 20);
+                                const nearAWS = findPriorityStationNearby(clickPt, 25);
+                                const nearAWSLevel = nearAWS ? (parseInt(nearAWS.RainfallLandslidethresholdwarninglevel) || 0) : 0;
+                                const isNearAvail = nearAWS ? (typeof isStationAvailable === 'function' ? isStationAvailable(nearAWS) : true) : false;
+                                const isNearDown = nearAWS ? (!isNearAvail || String(nearAWS.RainfallLandslidethresholdwarninglevel).toLowerCase() === 'down') : false;
+                                const nearLvlText = nearAWS ? (isNearDown ? 'Offline / Down' : (nearAWSLevel > 0 ? `Level ${nearAWSLevel}` : 'No Warning/Available')) : 'N/A';
 
                                 const conciseProps = {
                                     "Incident Type": "Recorded Historical Landslide",
                                     "Event Year": yr,
                                     "Location (LANDSLID_2)": loc,
-                                    "Nearest AWS Station": nearAWS ? `${nearAWS.StationName || nearAWS.Station} (${nearAWS.distance} km)` : "None nearby (>20km)",
-                                    "Weather Warning Level": nearAWS ? `Level ${nearAWS.RainfallLandslidethresholdwarninglevel}` : "N/A",
-                                    "Recommended Action": nearAWS ? (nearAWS.Recommendedactions || "Monitor") : "Monitor Local Advisories"
+                                    "Nearest AWS Station": nearAWS ? `${nearAWS.StationName || nearAWS.Station} (${nearAWS.distance} km)` : "None nearby in area",
+                                    "Weather Warning Level": nearLvlText,
+                                    "Recommended Action": nearAWS ? (nearAWS.Recommendedactions || (nearAWSLevel > 0 ? "Prepare for possible evacuation" : "Continue routine monitoring")) : "Monitor Local Advisories"
                                 };
                                 updatePropertiesTable("Recorded Landslide Incident", conciseProps);
                             }
@@ -2205,6 +2645,17 @@ function processAWSData(data) {
             var markerZIndex = (isNaN(warningLevel) ? 0 : warningLevel) * 1000;
             var marker = L.marker([lat, lng], { icon: L.icon({ iconUrl: iconUrl, iconSize: [25, 25], iconAnchor: [12, 12] }), zIndexOffset: markerZIndex });
 
+            var stationRawWLevel = isNaN(warningLevel) ? 0 : warningLevel;
+            var isStationDown = rawWarningLevel === 'down' || rawWarningLevel === 'offline' || (typeof isStationAvailable === 'function' && !isStationAvailable(station));
+            var warningLevelDisplay = '';
+            if (isStationDown) {
+                warningLevelDisplay = '<span class="warning-badge badge-level-offline">⚪ Offline / Down</span>';
+            } else if (stationRawWLevel > 0) {
+                warningLevelDisplay = `<span class="warning-badge badge-level-${stationRawWLevel}">⚠️ Level ${stationRawWLevel}</span>`;
+            } else {
+                warningLevelDisplay = '<span class="warning-badge badge-level-0">✅ No Warning/Available</span>';
+            }
+
             var popupContent = `
                 <div class="popup-container">
                     <div class="popup-header">${station.StationName || station.Station || 'Unknown Station'}</div>
@@ -2217,7 +2668,7 @@ function processAWSData(data) {
                             <tr><th>Longitude</th><td>${station.Longitude || 'N/A'}</td></tr>
                             <tr><th>Elevation</th><td>${station.Elevation ? station.Elevation + ' m' : 'N/A'}</td></tr>
                             <tr><th>Rainfall Antecedent+Cumulative (7-days)</th><td>${station.Rainfall || station.R24H || '0'} mm</td></tr>
-                            <tr><th>Warning Level</th><td>${station.RainfallLandslidethresholdwarninglevel || '0'}</td></tr>
+                            <tr><th>Warning Level</th><td>${warningLevelDisplay}</td></tr>
                             <tr><th>Description</th><td>${station.Rainfalldescription || 'N/A'}</td></tr>
                             <tr><th>Scenario</th><td>${station.Possiblescenario || 'N/A'}</td></tr>
                             <tr><th>Actions</th><td>${station.Recommendedactions || 'N/A'}</td></tr>
@@ -2785,7 +3236,10 @@ function renderAwsAdvisoriesTable() {
 
         sortedGroup.forEach(station => {
             const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
-            let bgColor = 'transparent'; let textColor = 'inherit'; let levelText = 'No Warning';
+            const isAvail = typeof isStationAvailable === 'function' ? isStationAvailable(station) : true;
+            const rawLvl = String(station.RainfallLandslidethresholdwarninglevel || '').toLowerCase();
+            let bgColor = 'transparent'; let textColor = 'inherit';
+            let levelText = (!isAvail || rawLvl === 'down') ? 'Offline / Down' : 'No Warning/Available';
             if (level === 1) { bgColor = '#f1c40f'; textColor = '#333'; levelText = 'Level 1 (Warning)'; } 
             else if (level === 2) { bgColor = '#e67e22'; textColor = '#fff'; levelText = 'Level 2 (Alert)'; } 
             else if (level === 3) { bgColor = '#e74c3c'; textColor = '#fff'; levelText = 'Level 3 (Evacuate)'; }
@@ -2863,7 +3317,10 @@ if (downloadAwsAdvisoriesPdfBtn) {
 
                 sortedGroup.forEach(station => {
                     const level = parseInt(station.RainfallLandslidethresholdwarninglevel) || 0;
-                    let bgColor = 'transparent'; let textColor = '#333'; let levelText = 'No Warning';
+                    const isAvail = typeof isStationAvailable === 'function' ? isStationAvailable(station) : true;
+                    const rawLvl = String(station.RainfallLandslidethresholdwarninglevel || '').toLowerCase();
+                    let bgColor = 'transparent'; let textColor = '#333';
+                    let levelText = (!isAvail || rawLvl === 'down') ? 'Offline / Down' : 'No Warning/Available';
                     if (level === 1) { bgColor = '#f1c40f'; textColor = '#333'; levelText = 'Level 1 (Warning)'; } 
                     else if (level === 2) { bgColor = '#e67e22'; textColor = '#fff'; levelText = 'Level 2 (Alert)'; } 
                     else if (level === 3) { bgColor = '#e74c3c'; textColor = '#fff'; levelText = 'Level 3 (Evacuate)'; }
